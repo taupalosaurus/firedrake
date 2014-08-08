@@ -483,15 +483,18 @@ def expression_kernel(expr, args):
         ast_expr = _ast(expr)
     else:
         ast_expr = ast.FlatBlock(str(expr) + ";")
-    body = ast.Block(
-        (
-            ast.Decl("int", d),
-            ast.For(ast.Assign(d, ast.Symbol(0)),
-                    ast.Less(d, ast.Symbol(fs.dof_dset.cdim)),
-                    ast.Incr(d, ast.Symbol(1)),
-                    ast_expr)
+    if fs.dof_dset.cdim > 1:
+        body = ast.Block(
+            (
+                ast.Decl("int", d),
+                ast.For(ast.Assign(d, ast.Symbol(0)),
+                        ast.Less(d, ast.Symbol(fs.dof_dset.cdim)),
+                        ast.Incr(d, ast.Symbol(1)),
+                        ast_expr)
+            )
         )
-    )
+    else:
+        body = ast_expr
 
     return op2.Kernel(ast.FunDecl("void", "expression",
                                   [arg.arg for arg in args], body),
