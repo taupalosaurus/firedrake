@@ -71,7 +71,7 @@ class DummyFunction(ufl.Coefficient):
 
     @property
     def arg(self):
-        argtype = self.function.dat.ctype + "*"
+        argtype = self.function.dat.ctype + "* restrict"
         name = " fn_%r" % self.argnum
 
         return ast.Decl(argtype, ast.Symbol(name))
