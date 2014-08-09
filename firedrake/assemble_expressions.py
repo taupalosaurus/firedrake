@@ -73,8 +73,9 @@ class DummyFunction(ufl.Coefficient):
     def arg(self):
         argtype = self.function.dat.ctype + "* restrict"
         name = " fn_%r" % self.argnum
+        qual = ["const"] if self.intent == op2.READ else []
 
-        return ast.Decl(argtype, ast.Symbol(name))
+        return ast.Decl(argtype, ast.Symbol(name), qualifiers=qual)
 
     @property
     def ast(self):
