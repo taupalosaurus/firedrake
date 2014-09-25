@@ -2,7 +2,7 @@ import ufl
 from ufl.algorithms import ReuseTransformer
 from ufl.constantvalue import ConstantValue, Zero, IntValue
 from ufl.indexing import MultiIndex
-from ufl.operatorbase import Operator
+from ufl.operatorbase import compute_hash, Operator
 from ufl.mathfunctions import MathFunction
 
 import pyop2.coffee.ast_base as ast
@@ -11,6 +11,9 @@ from pyop2 import op2
 import constant
 import function
 import functionspace
+
+# Global cache for expression ParLoops
+_expr_cache = {}
 
 _to_sum = lambda o: ast.Sum(_ast(o[0]), _to_sum(o[1:])) if len(o) > 1 else _ast(o[0])
 _to_prod = lambda o: ast.Prod(_ast(o[0]), _to_sum(o[1:])) if len(o) > 1 else _ast(o[0])
@@ -511,19 +514,31 @@ def evaluate_preprocessed_expression(expr, args, subset=None):
 
     # We need to splice the args according to the components of the
     # MixedFunctionSpace if we have one
+    parloops = []
     for j, dats in enumerate(zip(*tuple(a.function.dat for a in args))):
 
         itset = subset or args[0].function._function_space[j].node_set
         parloop_args = [dat(args[i].intent) for i, dat in enumerate(dats)]
-        op2.par_loop(kernel, itset, *parloop_args)
+        parloops.append(op2.ParLoop(kernel, itset, *parloop_args))
+        parloops[-1]._run()
+
+    return parloops
 
 
 def evaluate_expression(expr, subset=None):
     """Evaluates UFL expressions on :class:`.Function`\s."""
 
-    for tree in ExpressionSplitter().split(expr):
-        e, args, _ = ExpressionWalker().walk(tree)
-        evaluate_preprocessed_expression(e, args, subset)
+    h = compute_hash(expr)
+    if h in _expr_cache:
+        for parloops in _expr_cache[h]:
+            for pl in parloops:
+                pl._run()
+    else:
+        cached = []
+        for tree in ExpressionSplitter().split(expr):
+            e, args, _ = ExpressionWalker().walk(tree)
+            cached.append(evaluate_preprocessed_expression(e, args, subset))
+        _expr_cache[h] = cached
 
 
 def assemble_expression(expr, subset=None):
