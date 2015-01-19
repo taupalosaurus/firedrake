@@ -78,7 +78,8 @@ class FormSplitter(ReuseTransformer):
                                                             domain=it.domain(),
                                                             subdomain_id=it.subdomain_id(),
                                                             subdomain_data=it.subdomain_data(),
-                                                            metadata=it.metadata()))])
+                                                            metadata=it.metadata(),
+                                                            space=it.space()))])
             # 0 form
             if not args:
                 visit((0, 0))
