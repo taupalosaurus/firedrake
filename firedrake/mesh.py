@@ -420,9 +420,12 @@ class MeshBase(object):
             self._dx = ufl.Measure('cell', domain=self, subdomain_data=self.coordinates)
             self._ds = ufl.Measure('exterior_facet', domain=self, subdomain_data=self.coordinates)
             self._dS = ufl.Measure('interior_facet', domain=self, subdomain_data=self.coordinates)
+            self._dx_0 = ufl.Measure('cell', domain=self, subdomain_data=self.coordinates, space="reference")
+            self._ds_0 = ufl.Measure('exterior_facet', domain=self, subdomain_data=self.coordinates, space="reference")
+            self._dS_0 = ufl.Measure('interior_facet', domain=self, subdomain_data=self.coordinates, space="reference")
             # Set the subdomain_data on all the default measures to this
             # coordinate field.  Also set the domain on the measure.
-            for measure in [ufl.dx, ufl.ds, ufl.dS]:
+            for measure in [ufl.dx, ufl.ds, ufl.dS, ufl.dx_0, ufl.ds_0, ufl.dS_0]:
                 measure._subdomain_data = self.coordinates
                 measure._domain = self.ufl_domain()
         self._callback = callback
@@ -806,6 +809,8 @@ class ExtrudedMesh(MeshBase):
         # HACK alert!
         # Replace coordinate Function by one that has a real domain on it (but don't copy values)
         self.coordinates = function.Function(self._coordinate_fs, val=self.coordinates.dat)
+
+        # Note that this "invalidates" the ds and dS measures. Better solution?
         self._dx = ufl.Measure('cell', domain=self, subdomain_data=self.coordinates)
         self._ds = ufl.Measure('exterior_facet', domain=self, subdomain_data=self.coordinates)
         self._dS = ufl.Measure('interior_facet', domain=self, subdomain_data=self.coordinates)
@@ -814,8 +819,18 @@ class ExtrudedMesh(MeshBase):
         self._ds_v = ufl.Measure('exterior_facet_vert', domain=self, subdomain_data=self.coordinates)
         self._dS_h = ufl.Measure('interior_facet_horiz', domain=self, subdomain_data=self.coordinates)
         self._dS_v = ufl.Measure('interior_facet_vert', domain=self, subdomain_data=self.coordinates)
+        self._dx_0 = ufl.Measure('cell', domain=self, subdomain_data=self.coordinates, space="reference")
+        self._ds_0 = ufl.Measure('exterior_facet', domain=self, subdomain_data=self.coordinates, space="reference")
+        self._dS_0 = ufl.Measure('interior_facet', domain=self, subdomain_data=self.coordinates, space="reference")
+        self._ds_t_0 = ufl.Measure('exterior_facet_top', domain=self, subdomain_data=self.coordinates, space="reference")
+        self._ds_b_0 = ufl.Measure('exterior_facet_bottom', domain=self, subdomain_data=self.coordinates, space="reference")
+        self._ds_v_0 = ufl.Measure('exterior_facet_vert', domain=self, subdomain_data=self.coordinates, space="reference")
+        self._dS_h_0 = ufl.Measure('interior_facet_horiz', domain=self, subdomain_data=self.coordinates, space="reference")
+        self._dS_v_0 = ufl.Measure('interior_facet_vert', domain=self, subdomain_data=self.coordinates, space="reference")
         # Set the subdomain_data on all the default measures to this coordinate field.
-        for measure in [ufl.ds, ufl.dS, ufl.dx, ufl.ds_t, ufl.ds_b, ufl.ds_v, ufl.dS_h, ufl.dS_v]:
+        for measure in [ufl.dx, ufl.ds, ufl.dS, ufl.ds_t, ufl.ds_b, ufl.ds_v, ufl.dS_h, ufl.dS_v,
+                        ufl.dx_0, ufl.ds_0, ufl.dS_0,
+                        ufl.ds_t_0, ufl.ds_b_0, ufl.ds_v_0, ufl.dS_h_0, ufl.dS_v_0]:
             measure._subdomain_data = self.coordinates
             measure._domain = self.ufl_domain()
 
