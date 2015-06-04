@@ -3,6 +3,10 @@ import os
 import FIAT
 import ufl
 import weakref
+try:
+    from rtree import index
+except ImportError:
+    index = None
 
 from pyop2 import op2
 from pyop2.profiling import timed_function, timed_region, profile
@@ -415,6 +419,9 @@ class Mesh(object):
             # global).  Furthermore, it's never used anyway.
             for measure in [ufl.dx, ufl.ds, ufl.dS]:
                 measure._subdomain_data = weakref.ref(self.coordinates)
+
+            self._cell_index = None
+
         self._callback = callback
 
     def init(self):
@@ -634,6 +641,39 @@ class Mesh(object):
                      cell_orientations.dat(op2.WRITE, cell_orientations.cell_node_map()),
                      self.coordinates.dat(op2.READ, self.coordinates.cell_node_map()))
         self._cell_orientations = cell_orientations
+
+    def init_cell_bounds(self):
+        """Compute bounding box dimensions around each cell.
+        """
+        if self._cell_index:
+            return
+        if not index:
+            raise ImportError("Point evaluation requires libspatialindex and the rtree package")
+
+        dim = self.cell_dimension()
+        p = index.Property()
+        p.dimension = dim
+
+        # Could write this as a par_loop...
+        idx = self._coordinate_fs.cell_node_map().values
+        coords = self.coordinates.dat.data
+        cell_coords = np.empty((dim,) + idx.shape)
+        for d in range(self.cell_dimension()):
+            cell_coords[d, :, :] = np.take(coords[:,d], idx)
+
+        def bound_generator():
+            for i in np.arange(idx.shape[0]):
+                cmin = [np.amin(cell_coords[d, i, :]) for d in range(dim)]
+                cmax = [np.amax(cell_coords[d, i, :]) for d in range(dim)]
+                yield i, cmin + cmax, i
+
+        self._cell_index = index.Index(bound_generator(), properties=p, interleaved=True)
+
+    def find_cell(self, coordinates):
+        if not self._cell_index:
+            # Build r-tree index for cell identification
+            self.init_cell_bounds()
+        return self._cell_index.intersection(coordinates, objects='raw')
 
     def ufl_id(self):
         return id(self)
