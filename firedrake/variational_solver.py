@@ -233,3 +233,13 @@ class LinearVariationalSolver(NonlinearVariationalSolver):
         self.parameters.setdefault('snes_type', 'ksponly')
         self.parameters.setdefault('ksp_rtol', 1.0e-7)
         solving_utils.update_parameters(self, self.snes)
+
+    def set_jacobian_assembled(self, state):
+        """Set the assembly state of the Jacobian for this solver.
+
+        By default, the solver assumes that the jacobian is
+        time-invariant (and will only be assembled once).  If the mesh
+        moves (or some coefficients are time-varying) this is not
+        true.  In this case, you should explicitly set the assembled
+        state of the Jacobian to False when things change."""
+        self._ctx._jacobians_assembled[-1] = state
