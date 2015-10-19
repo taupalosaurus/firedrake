@@ -519,6 +519,38 @@ def get_facet_nodes(np.ndarray[np.int32_t, ndim=2, mode="c"] facet_cells,
 
 @cython.boundscheck(False)
 @cython.wraparound(False)
+def get_facet_vertices(PETSc.DM plex, np.ndarray[np.int32_t, mode="c"] facets):
+    """
+    Derives the vertices directly adjacent to each facet, ie. all vertices in closure(f).
+
+    :arg facets: Array of facets for which to find associated vertices
+    :arg facet_vertices: 2D array of vertices associated with each facet
+    """
+    cdef:
+        PetscInt f, fStart, fEnd, vStart, vEnd, nfacets, v_per_facet, cl, nclosure, i
+        PetscInt *closure = NULL
+        np.ndarray[np.int32_t, ndim=2, mode="c"] facet_vertices
+
+    vStart, vEnd = plex.getDepthStratum(0)
+    nfacets = facets.shape[0]
+    v_per_facet = plex.getConeSize(facets[0])
+    facet_vertices = np.empty((nfacets, v_per_facet), dtype=np.int32)
+    for f in range(nfacets):
+        CHKERR(DMPlexGetTransitiveClosure(plex.dm, facets[f], PETSC_TRUE,
+                                          &nclosure, &closure))
+        i = 0
+        for cl in range(nclosure):
+            if vStart <= closure[2*cl] < vEnd:
+                facet_vertices[f, i] = closure[2*cl] - vStart
+                i += 1
+    if closure != NULL:
+        CHKERR(DMPlexRestoreTransitiveClosure(plex.dm, 0, PETSC_TRUE,
+                                              NULL, &closure))
+    return facet_vertices
+
+
+@cython.boundscheck(False)
+@cython.wraparound(False)
 def label_facets(PETSc.DM plex, label_boundary=True):
     """Add labels to facets in the the plex
 

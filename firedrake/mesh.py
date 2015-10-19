@@ -480,13 +480,13 @@ class Mesh(object):
             # Compute the facet_numbering
 
             # Order exterior facets by OP2 entity class
-            exterior_facets, exterior_facet_classes = \
+            self._exterior_facets, exterior_facet_classes = \
                 dmplex.get_facets_by_class(self._plex, "exterior_facets")
 
             # Derive attached boundary IDs
             if self._plex.hasLabel("boundary_ids"):
-                boundary_ids = np.zeros(exterior_facets.size, dtype=np.int32)
-                for i, facet in enumerate(exterior_facets):
+                boundary_ids = np.zeros(self._exterior_facets.size, dtype=np.int32)
+                for i, facet in enumerate(self._exterior_facets):
                     boundary_ids[i] = self._plex.getLabelValue("boundary_ids", facet)
 
                 unique_ids = np.sort(self._plex.getLabelIdIS("boundary_ids").indices)
@@ -496,7 +496,7 @@ class Mesh(object):
 
             exterior_local_facet_number, exterior_facet_cell = \
                 dmplex.facet_numbering(self._plex, "exterior",
-                                       exterior_facets,
+                                       self._exterior_facets,
                                        self._cell_numbering,
                                        self.cell_closure)
 
@@ -512,17 +512,21 @@ class Mesh(object):
                            unique_markers=unique_ids)
 
     @utils.cached_property
+    def exterior_facet_vertices(self):
+        return dmplex.get_facet_vertices(self._plex, self._exterior_facets)
+
+    @utils.cached_property
     def interior_facets(self):
         if self._plex.getStratumSize("interior_facets", 1) > 0:
             # Compute the facet_numbering
 
             # Order interior facets by OP2 entity class
-            interior_facets, interior_facet_classes = \
+            self._interior_facets, interior_facet_classes = \
                 dmplex.get_facets_by_class(self._plex, "interior_facets")
 
             interior_local_facet_number, interior_facet_cell = \
                 dmplex.facet_numbering(self._plex, "interior",
-                                       interior_facets,
+                                       self._interior_facets,
                                        self._cell_numbering,
                                        self.cell_closure)
 
@@ -530,6 +534,10 @@ class Mesh(object):
                            interior_facet_cell, interior_local_facet_number)
         else:
             return _Facets(self, 0, "interior", None, None)
+
+    @utils.cached_property
+    def interior_facet_vertices(self):
+        return dmplex.get_facet_vertices(self._plex, self._interior_facets)
 
     @utils.cached_property
     def cell_closure(self):
