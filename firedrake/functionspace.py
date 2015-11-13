@@ -16,7 +16,8 @@ from firedrake import fiat_utils
 import firedrake.mesh as mesh_t
 from firedrake import halo
 from firedrake import utils
-
+from snapr import *
+from utils import *
 
 __all__ = ['FunctionSpace', 'VectorFunctionSpace',
            'TensorFunctionSpace', 'MixedFunctionSpace',
@@ -384,6 +385,8 @@ class FunctionSpaceBase(ObjectCached):
                           offset,
                           parent,
                           self.bt_masks)
+            # from IPython import embed; embed()
+            oh_snap(val, "is_interior", is_interior(self.fiat_element.entity_dofs()))
 
             if decorate:
                 val = op2.DecoratedMap(val, vector_index=True)
