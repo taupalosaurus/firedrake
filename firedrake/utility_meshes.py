@@ -7,6 +7,8 @@ from shutil import rmtree
 from pyop2.mpi import MPI
 from pyop2.profiling import profile
 
+from firedrake import VectorFunctionSpace, Function, Constant, \
+    par_loop, dx, WRITE, READ
 from firedrake import mesh
 from firedrake import expression
 from firedrake import function
@@ -18,12 +20,15 @@ __all__ = ['IntervalMesh', 'UnitIntervalMesh',
            'PeriodicIntervalMesh', 'PeriodicUnitIntervalMesh',
            'UnitTriangleMesh',
            'RectangleMesh', 'SquareMesh', 'UnitSquareMesh',
+           'PeriodicRectangleMesh', 'PeriodicSquareMesh',
+           'PeriodicUnitSquareMesh',
            'CircleMesh', 'UnitCircleMesh',
            'CircleManifoldMesh',
            'UnitTetrahedronMesh',
            'BoxMesh', 'CubeMesh', 'UnitCubeMesh',
            'IcosahedralSphereMesh', 'UnitIcosahedralSphereMesh',
-           'CubedSphereMesh', 'UnitCubedSphereMesh']
+           'CubedSphereMesh', 'UnitCubedSphereMesh',
+           'TorusMesh']
 
 
 _cachedir = os.path.join(tempfile.gettempdir(),
@@ -159,48 +164,33 @@ def PeriodicIntervalMesh(ncells, length):
     :arg ncells: The number of cells over the interval.
     :arg length: The length the interval."""
 
-    if MPI.comm.size > 1:
-        raise NotImplementedError("Periodic intervals not yet implemented in parallel")
-    nvert = ncells
-    nedge = ncells
-    plex = PETSc.DMPlex().create()
-    plex.setDimension(1)
-    plex.setChart(0, nvert+nedge)
-    for e in range(nedge):
-        plex.setConeSize(e, 2)
-    plex.setUp()
-    for e in range(nedge-1):
-        plex.setCone(e, [nedge+e, nedge+e+1])
-        plex.setConeOrientation(e, [0, 0])
-    # Connect v_(n-1) with v_0
-    plex.setCone(nedge-1, [nedge+nvert-1, nedge])
-    plex.setConeOrientation(nedge-1, [0, 0])
-    plex.symmetrize()
-    plex.stratify()
+    if ncells < 3:
+        raise ValueError("1D periodic meshes with fewer than 3 \
+cells are not currently supported")
 
-    # Build coordinate section
-    dx = float(length) / ncells
-    coords = [x for x in np.arange(0, length + 0.01 * dx, dx)]
+    m = CircleManifoldMesh(ncells)
+    coord_fs = VectorFunctionSpace(m, 'DG', 1, dim=1)
+    old_coordinates = m.coordinates
+    new_coordinates = Function(coord_fs)
 
-    coordsec = plex.getCoordinateSection()
-    coordsec.setChart(nedge, nedge+nvert)
-    for v in range(nedge, nedge+nvert):
-        coordsec.setDof(v, 1)
-    coordsec.setUp()
-    size = coordsec.getStorageSize()
-    coordvec = PETSc.Vec().createWithArray(coords, size=size)
-    plex.setCoordinatesLocal(coordvec)
+    periodic_kernel = """double Y,pi;
+            Y = 0.5*(old_coords[0][1]-old_coords[1][1]);
+            pi=3.141592653589793;
+            for(int i=0;i<2;i++){
+            new_coords[i][0] = atan2(old_coords[i][1],old_coords[i][0])/pi/2;
+            if(new_coords[i][0]<0.) new_coords[i][0] += 1;
+            if(new_coords[i][0]==0 && Y<0.) new_coords[i][0] = 1.0;
+            new_coords[i][0] *= L[0];
+            }"""
 
-    dx = length / ncells
-    # HACK ALERT!
-    # Almost certainly not right when symbolic geometry stuff lands.
-    # Hopefully DMPlex will eventually give us a DG coordinate
-    # field.  Until then, we build one by hand.
-    coords = np.dstack((np.arange(dx, length + dx*0.01, dx),
-                        np.arange(0, length - dx*0.01, dx))).flatten()
-    # Last cell is back to front.
-    coords[-2:] = coords[-2:][::-1]
-    return mesh.Mesh(plex, periodic_coords=coords, reorder=False)
+    cL = Constant(length)
+
+    par_loop(periodic_kernel, dx,
+             {"new_coords": (new_coordinates, WRITE),
+              "old_coords": (old_coordinates, READ),
+              "L": (cL, READ)})
+
+    return mesh.Mesh(new_coordinates)
 
 
 def PeriodicUnitIntervalMesh(ncells):
@@ -319,6 +309,103 @@ def UnitSquareMesh(nx, ny, reorder=None, quadrilateral=False):
 
 
 @profile
+def PeriodicRectangleMesh(nx, ny, Lx, Ly, quadrilateral=False, reorder=None):
+    """Generate a periodic rectangular mesh
+
+    :arg nx: The number of cells in the x direction
+    :arg ny: The number of cells in the y direction
+    :arg Lx: The extent in the x direction
+    :arg Ly: The extent in the y direction
+    :kwarg quadrilateral: (optional), creates quadrilateral mesh, defaults to False
+    :kwarg reorder: (optional), should the mesh be reordered
+    """
+
+    if nx < 3 or ny < 3:
+        raise ValueError("2D periodic meshes with fewer than 3 \
+cells in each direction are not currently supported")
+
+    m = TorusMesh(nx, ny, 1.0, 0.5, quadrilateral=quadrilateral, reorder=reorder)
+    coord_fs = VectorFunctionSpace(m, 'DG', 1, dim=2)
+    old_coordinates = m.coordinates
+    new_coordinates = Function(coord_fs)
+
+    periodic_kernel = """
+double pi = 3.141592653589793;
+double eps = 1e-12;
+double bigeps = 1e-1;
+double phi, theta, Y, Z;
+Y = 0.0;
+Z = 0.0;
+
+for(int i=0; i<old_coords.dofs; i++) {
+    Y += old_coords[i][1];
+    Z += old_coords[i][2];
+}
+
+for(int i=0; i<new_coords.dofs; i++) {
+    phi = atan2(old_coords[i][1], old_coords[i][0]);
+    if (fabs(sin(phi)) > bigeps)
+        theta = atan2(old_coords[i][2], old_coords[i][1]/sin(phi) - 1.0);
+    else
+        theta = atan2(old_coords[i][2], old_coords[i][0]/cos(phi) - 1.0);
+
+    new_coords[i][0] = phi/(2.0*pi);
+    if(new_coords[i][0] < -eps) {
+        new_coords[i][0] += 1.0;
+    }
+    if(fabs(new_coords[i][0]) < eps && Y < 0.0) {
+        new_coords[i][0] = 1.0;
+    }
+
+    new_coords[i][1] = theta/(2.0*pi);
+    if(new_coords[i][1] < -eps) {
+        new_coords[i][1] += 1.0;
+    }
+    if(fabs(new_coords[i][1]) < eps && Z < 0.0) {
+        new_coords[i][1] = 1.0;
+    }
+
+    new_coords[i][0] *= Lx[0];
+    new_coords[i][1] *= Ly[0];
+}
+"""
+
+    cLx = Constant(Lx)
+    cLy = Constant(Ly)
+
+    par_loop(periodic_kernel, dx,
+             {"new_coords": (new_coordinates, WRITE),
+              "old_coords": (old_coordinates, READ),
+              "Lx": (cLx, READ),
+              "Ly": (cLy, READ)})
+
+    return mesh.Mesh(new_coordinates)
+
+
+def PeriodicSquareMesh(nx, ny, L, quadrilateral=False, reorder=None):
+    """Generate a periodic square mesh
+
+    :arg nx: The number of cells in the x direction
+    :arg ny: The number of cells in the y direction
+    :arg L: The extent in the x and y directions
+    :kwarg quadrilateral: (optional), creates quadrilateral mesh, defaults to False
+    :kwarg reorder: (optional), should the mesh be reordered
+    """
+    return PeriodicRectangleMesh(nx, ny, L, L, quadrilateral=quadrilateral, reorder=reorder)
+
+
+def PeriodicUnitSquareMesh(nx, ny, reorder=None, quadrilateral=False):
+    """Generate a periodic unit square mesh
+
+    :arg nx: The number of cells in the x direction
+    :arg ny: The number of cells in the y direction
+    :kwarg quadrilateral: (optional), creates quadrilateral mesh, defaults to False
+    :kwarg reorder: (optional), should the mesh be reordered
+    """
+    return PeriodicSquareMesh(nx, ny, 1.0, reorder=reorder, quadrilateral=quadrilateral)
+
+
+@profile
 def CircleMesh(radius, resolution, reorder=None):
     """Generate a structured triangular mesh of a circle.
 
@@ -352,6 +439,7 @@ def UnitCircleMesh(resolution, reorder=None):
     return CircleMesh(1.0, resolution, reorder=reorder)
 
 
+@profile
 def CircleManifoldMesh(ncells, radius=1):
     """Generated a 1D mesh of the circle, immersed in 2D.
 
@@ -546,13 +634,13 @@ def IcosahedralSphereMesh(radius, refinement_level=0, degree=1, reorder=None):
     scale = (radius / np.linalg.norm(coords, axis=1)).reshape(-1, 1)
     coords *= scale
     m = mesh.Mesh(plex, dim=3, reorder=reorder)
-    m._icosahedral_sphere = radius
     if degree > 1:
         new_coords = function.Function(functionspace.VectorFunctionSpace(m, "CG", degree))
         new_coords.interpolate(expression.Expression(("x[0]", "x[1]", "x[2]")))
         # "push out" to sphere
         new_coords.dat.data[:] *= (radius / np.linalg.norm(new_coords.dat.data, axis=1)).reshape(-1, 1)
-        m.coordinates = new_coords
+        m = mesh.Mesh(new_coords)
+    m._icosahedral_sphere = radius
     return m
 
 
@@ -696,6 +784,7 @@ def _cubedsphere_cells_and_coords(radius, refinement_level):
     return cells, coords
 
 
+@profile
 def CubedSphereMesh(radius, refinement_level=0, degree=1,
                     reorder=None, use_dmplex_refinement=False):
     """Generate an cubed approximation to the surface of the
@@ -757,7 +846,7 @@ def CubedSphereMesh(radius, refinement_level=0, degree=1,
         new_coords.interpolate(expression.Expression(("x[0]", "x[1]", "x[2]")))
         # "push out" to sphere
         new_coords.dat.data[:] *= (radius / np.linalg.norm(new_coords.dat.data, axis=1)).reshape(-1, 1)
-        m.coordinates = new_coords
+        m = mesh.Mesh(new_coords)
 
     return m
 
@@ -772,3 +861,41 @@ def UnitCubedSphereMesh(refinement_level=0, degree=1, reorder=None):
     """
     return CubedSphereMesh(1.0, refinement_level=refinement_level,
                            degree=degree, reorder=reorder)
+
+
+@profile
+def TorusMesh(nR, nr, R, r, quadrilateral=False, reorder=None):
+    """Generate a toroidal mesh
+
+    :arg nR: The number of cells in the major direction (min 3)
+    :arg nr: The number of cells in the minor direction (min 3)
+    :arg R: The major radius
+    :arg r: The minor radius
+    :kwarg quadrilateral: (optional), creates quadrilateral mesh, defaults to False
+    :kwarg reorder: (optional), should the mesh be reordered
+    """
+    if nR < 3 or nr < 3:
+        raise ValueError("Must have at least 3 cells in each direction")
+
+    # gives an array [[0, 0], [0, 1], ..., [1, 0], [1, 1], ...]
+    idx_temp = np.asarray(np.meshgrid(np.arange(nR), np.arange(nr))).swapaxes(0, 2).reshape(-1, 2)
+
+    # vertices - standard formula for (x, y, z), see Wikipedia
+    vertices = np.column_stack((
+        (R + r*np.cos(idx_temp[:, 1]*(2*np.pi/nr)))*np.cos(idx_temp[:, 0]*(2*np.pi/nR)),
+        (R + r*np.cos(idx_temp[:, 1]*(2*np.pi/nr)))*np.sin(idx_temp[:, 0]*(2*np.pi/nR)),
+        r*np.sin(idx_temp[:, 1]*(2*np.pi/nr))))
+
+    # cell vertices
+    i, j = np.meshgrid(np.arange(nR), np.arange(nr))
+    i = i.reshape(-1)  # Miklos's suggestion to make the code
+    j = j.reshape(-1)  # less impenetrable
+    cells = [i*nr + j, i*nr + (j+1) % nr, ((i+1) % nR)*nr + (j+1) % nr, ((i+1) % nR)*nr + j]
+    cells = np.column_stack(cells)
+    if not quadrilateral:
+        # two cells per cell above...
+        cells = cells[:, [0, 1, 3, 1, 2, 3]].reshape(-1, 3)
+
+    plex = mesh._from_cell_list(2, cells, vertices)
+    m = mesh.Mesh(plex, dim=3, reorder=reorder)
+    return m

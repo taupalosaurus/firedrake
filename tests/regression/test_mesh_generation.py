@@ -81,13 +81,11 @@ def test_interval_parallel():
     assert abs(integrate_one(IntervalMesh(30, 5.0)) - 5.0) < 1e-3
 
 
-@pytest.mark.xfail(reason='Periodic intervals not implemented in parallel')
 @pytest.mark.parallel
 def test_periodic_unit_interval_parallel():
     assert abs(integrate_one(PeriodicUnitIntervalMesh(30)) - 1) < 1e-3
 
 
-@pytest.mark.xfail(reason='Periodic intervals not implemented in parallel')
 @pytest.mark.parallel
 def test_periodic_interval_parallel():
     assert abs(integrate_one(PeriodicIntervalMesh(30, 5.0)) - 5.0) < 1e-3
@@ -178,6 +176,37 @@ def test_bendy_cube_unit():
 
 test_bendy_cube_parallel = pytest.mark.parallel(nprocs=2)(test_bendy_cube)
 test_bendy_cube_unit_parallel = pytest.mark.parallel(nprocs=2)(test_bendy_cube_unit)
+
+
+def test_mesh_reordering_defaults_on():
+    assert parameters["reorder_meshes"]
+    m = UnitSquareMesh(1, 1)
+    m.init()
+
+    assert m._did_reordering
+
+
+@pytest.mark.parametrize("reorder",
+                         [False, True])
+def test_force_reordering_works(reorder):
+    m = UnitSquareMesh(1, 1, reorder=reorder)
+    m.init()
+
+    assert m._did_reordering == reorder
+
+
+@pytest.mark.parametrize("reorder",
+                         [False, True])
+def test_changing_default_reorder_works(reorder):
+    old_reorder = parameters["reorder_meshes"]
+    try:
+        parameters["reorder_meshes"] = reorder
+        m = UnitSquareMesh(1, 1)
+        m.init()
+
+        assert m._did_reordering == reorder
+    finally:
+        parameters["reorder_meshes"] = old_reorder
 
 
 if __name__ == '__main__':

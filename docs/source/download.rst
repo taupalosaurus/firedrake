@@ -27,7 +27,7 @@ The installation script is tested on Ubuntu and MacOS X. Installation
 is likely to work well on other Linux platforms, although the script
 may stop to ask you to install some dependency packages. Installation
 on other Unix platforms may work but is untested. Installation on
-Windows is very unlikely work.
+Windows is very unlikely to work.
 
 Upgrade
 -------
@@ -48,11 +48,30 @@ compiled modules. To do this run::
 If you installed to a virtualenv, you will need to activate the
 virtualenv first.
 
+Recovering from a broken installation script
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+If you find yourself in the unfortunate position that
+`firedrake-update` won't run because of a bug, and the bug has been
+fixed in Firedrake master, then the following procedure will rebuild
+`firedrake-update` using the latest version.
+
+From the top directory of your Firedrake install,
+type::
+
+  cd src/firedrake
+  git pull
+  ./scripts/firedrake-install --rebuild-script
+
+You should also pass any of the other options to `firedrake-install`
+which you wish the rebuilt script to apply (for example `--user` or
+`--disable-ssh`). You should now be able to run `firedrake-update`.
+
 
 Installing from individual components
 =====================================
 
-Firedrake depends on PyOP2_, FFC_, FIAT_, and UFL_. It is easiest to obtain
+Firedrake depends on PyOP2_, FFC_, FIAT_, UFL_ and h5py_. It is easiest to obtain
 all of these components on Ubuntu Linux and related distributions such as Mint
 or Debian. Installation on other Unix-like operating systems is likely to be
 possible, although harder. Installation on a Mac is straightforward using the
@@ -100,6 +119,29 @@ modify the pip invocation for either case above as follows::
 
   pip install --user ...
 
+h5py
+----
+
+It is critical that h5py_ is linked against the same version of the
+HDF5 library that PETSc was built with.  This is unfortunately not
+possible to specify when using ``pip``.  Instead, please follow the
+instructions for a `custom installation`_.  If PETSc was linked
+against a system HDF5 library, use that library when building h5py.
+If the PETSc installation was used to build HDF5 (via
+``--download-hdf5``) then the appropriate HDF5 library is in the PETSc
+install directory.  If installed with ``pip``, this can be obtained
+using::
+
+  python -c "import petsc; print petsc.get_petsc_dir()"
+
+Otherwise, use the appropriate values of ``PETSC_DIR`` and ``PETSC_ARCH``.
+
+.. note::
+
+   It is not necessary that h5py be built with MPI support, although
+   Firedrake supports both options.
+
+
 Potential installation errors on Mac OS
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -130,9 +172,17 @@ is to download a binary from the `paraview website <Paraview_>`_.
 Firedrake
 ---------
 
-In addition to PyOP2, you will need to install Firedrake. There are two
-routes, depending on whether you intend to contribute to Firedrake
-development.
+In addition to PyOP2, Firedrake also depends on libspatialindex_.  On
+Ubuntu and relatives type::
+
+  sudo apt-get install libspatialindex-dev
+
+while on Mac OS it's::
+
+  brew install spatialindex
+
+Now you need to install Firedrake.  There are two routes, depending on
+whether you intend to contribute to Firedrake development.
 
 For performance reasons, there are various levels of caching with
 eviction policies.  To support these, you will need to install
@@ -224,7 +274,8 @@ Building the documention requires Sphinx_
 (including the Youtube and Bibtex plugins) and wget_. For example on Ubuntu-like
 Linux systems::
 
-  sudo apt-get install python-sphinx wget
+  sudo apt-get install wget
+  sudo pip install sphinx
 
 and on Mac OS::
 
@@ -261,3 +312,6 @@ Finally install the Bibtex plugin::
 .. _wget: http://www.gnu.org/software/wget/
 .. _Swig: http://www.swig.org/
 .. _virtualenv: https://virtualenv.pypa.io/
+.. _libspatialindex: https://libspatialindex.github.io/
+.. _h5py: http://www.h5py.org/
+.. _custom installation: http://docs.h5py.org/en/latest/build.html#custom-installation
