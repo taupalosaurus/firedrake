@@ -8,6 +8,7 @@ from ufl.domain import join_domains
 
 from pyop2 import READ, WRITE, RW, INC  # NOQA get flake8 to ignore unused import.
 import pyop2
+from pyop2.configuration import configure
 
 import coffee.base as ast
 
@@ -246,4 +247,5 @@ def par_loop(kernel, measure, args, **kwargs):
         return f.dat(intent, _map['nodes'](f))
     op2args += [mkarg(func, intent) for (func, intent) in args.itervalues()]
 
-    return pyop2.par_loop(*op2args)
+    with configure("hpc_code_gen", 1):
+        return pyop2.par_loop(*op2args)

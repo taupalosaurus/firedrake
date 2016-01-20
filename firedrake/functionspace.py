@@ -403,7 +403,6 @@ class FunctionSpaceBase(ObjectCached):
                           offset,
                           parent,
                           self.bt_masks)
-            # from IPython import embed; embed()
             oh_snap(val, "is_interior", is_interior(self.fiat_element.entity_dofs()))
 
             if decorate:

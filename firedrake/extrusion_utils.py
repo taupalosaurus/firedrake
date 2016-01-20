@@ -2,6 +2,7 @@ from __future__ import absolute_import
 import numpy as np
 
 from pyop2 import op2
+from pyop2.configuration import configure
 
 
 def make_extruded_coords(extruded_topology, base_coords, ext_coords,
@@ -158,9 +159,10 @@ def make_extruded_coords(extruded_topology, base_coords, ext_coords,
                     np.repeat(np.arange(layers-1, dtype=np.int32),
                               extruded_topology.cell_set.total_size).reshape(layers-1, extruded_topology.cell_set.total_size).T.ravel(), dtype=np.int32)
     height = op2.Global(1, layer_height, dtype=float)
-    op2.par_loop(kernel,
-                 ext_coords.cell_set,
-                 base_coords.dat(op2.READ, base_coords.cell_node_map()),
-                 ext_coords.dat(op2.WRITE, ext_coords.cell_node_map()),
-                 layer(op2.READ, layer_fs.cell_node_map()),
-                 height(op2.READ))
+    with configure("hpc_code_gen", 1):
+        op2.par_loop(kernel,
+                     ext_coords.cell_set,
+                     base_coords.dat(op2.READ, base_coords.cell_node_map()),
+                     ext_coords.dat(op2.WRITE, ext_coords.cell_node_map()),
+                     layer(op2.READ, layer_fs.cell_node_map()),
+                     height(op2.READ))

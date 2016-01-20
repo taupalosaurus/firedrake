@@ -8,6 +8,7 @@ from pyop2 import op2
 from pyop2.logger import info_red
 from pyop2.profiling import timed_function, timed_region, profile
 from pyop2.utils import as_tuple
+from pyop2.configuration import configure
 
 import coffee.base as ast
 
@@ -904,9 +905,10 @@ values from f.)"""
         # pass it in for facet integrals and the like)
         fs = functionspace.FunctionSpace(self, 'DG', 0)
         cell_orientations = function.Function(fs, name="cell_orientations", dtype=np.int32)
-        op2.par_loop(kernel, self.cell_set,
-                     cell_orientations.dat(op2.WRITE, cell_orientations.cell_node_map()),
-                     self.coordinates.dat(op2.READ, self.coordinates.cell_node_map()))
+        with configure("hpc_code_gen", 1):
+           op2.par_loop(kernel, self.cell_set,
+                        cell_orientations.dat(op2.WRITE, cell_orientations.cell_node_map()),
+                        self.coordinates.dat(op2.READ, self.coordinates.cell_node_map()))
         self.topology._cell_orientations = cell_orientations
 
     def __getattr__(self, name):

@@ -9,6 +9,7 @@ import coffee.base as ast
 
 from pyop2 import op2
 from pyop2.logger import warning
+from pyop2.configuration import configure
 
 from firedrake import expression as expression_t
 from firedrake import functionspace
@@ -377,7 +378,8 @@ class Function(ufl.Coefficient):
 
         for _, arg in expression._user_args:
             args.append(arg(op2.READ))
-        op2.par_loop(*args)
+        with configure("hpc_code_gen", 1):
+            op2.par_loop(*args)
 
     def _interpolate_python_kernel(self, expression, to_pts, to_element, fs, coords):
         """Produce a :class:`PyOP2.Kernel` wrapping the eval method on the
@@ -456,6 +458,7 @@ double %(x)s[%(dim)d];
 const double pi = 3.141592653589793;
 
 """ % vals)
+        # Use flattened arg for this expression
         block = ast.FlatBlock("""
 for (unsigned int %(d)s=0; %(d)s < %(dim)d; %(d)s++) {
   %(x)s[%(d)s] = 0;
