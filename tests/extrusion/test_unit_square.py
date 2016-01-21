@@ -3,6 +3,7 @@ import numpy as np
 from firedrake import *
 import pyop2 as op2
 from pyop2.profiling import *
+from pyop2.configuration import configure
 
 
 def integrate_unit_square(family, degree):
@@ -33,11 +34,12 @@ void comp_area(double A[1], double *x[], double *y[])
 
     coords = f.function_space().mesh().coordinates
 
-    op2.par_loop(area, f.cell_set,
-                 g(op2.INC),
-                 coords.dat(op2.READ, coords.cell_node_map()),
-                 f.dat(op2.READ, f.cell_node_map())
-                 )
+    with configure("hpc_code_gen", 1):
+        op2.par_loop(area, f.cell_set,
+                     g(op2.INC),
+                     coords.dat(op2.READ, coords.cell_node_map()),
+                     f.dat(op2.READ, f.cell_node_map())
+                    )
 
     return np.abs(g.data[0] - 1.0)
 

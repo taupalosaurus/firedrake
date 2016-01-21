@@ -82,4 +82,4 @@ def inject(fine, coarse):
         return
     op2.par_loop(hierarchy._inject_kernel, hierarchy._cell_sets[lvl],
                  coarse.dat(op2.WRITE, coarse.cell_node_map()[op2.i[0]]),
-                 fine.dat(op2.READ, hierarchy.cell_node_map(lvl)))
+                 fine.dat(op2.READ, hierarchy.cell_node_map(lvl),flatten=True))

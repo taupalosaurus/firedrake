@@ -10,6 +10,7 @@ from pyop2 import op2
 
 from firedrake.petsc import PETSc
 from firedrake.parameters import parameters
+from pyop2.configuration import configuration
 
 
 def get_transformations(fiat_cell):
@@ -260,11 +261,12 @@ def get_injection_kernel(fiat_element, unique_indices, dim=1):
     i = ast.Symbol("i", ())
     j = ast.Symbol("j", ())
     k = ast.Symbol("k", ())
+    flat_ast = ast.Sum(ast.Prod(ast.c_sym(nfdof), k), j)
     if all_same:
-        assign = ast.Prod(ast.Symbol("fine", (j, k)),
+        assign = ast.Prod(ast.Symbol("fine", (j, k) if configuration["hpc_code_gen"] == 1 else (flat_ast,)),
                           w_sym)
     else:
-        assign = ast.Prod(ast.Symbol("fine", (j, k)),
+        assign = ast.Prod(ast.Symbol("fine", (j, k) if configuration["hpc_code_gen"] == 1 else (flat_ast,)),
                           ast.Symbol("weights", (i, j)))
     assignment = ast.Incr(ast.Symbol("coarse", (ast.Sum(k, ast.Prod(i, ast.c_sym(dim))),)),
                           assign)

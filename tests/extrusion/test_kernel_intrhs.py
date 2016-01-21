@@ -3,6 +3,7 @@ import numpy as np
 from firedrake import *
 import pyop2 as op2
 import ufl
+from pyop2.configuration import configure
 
 
 def integrate_rhs(family, degree):
@@ -32,9 +33,10 @@ void populate_tracer(double *x[], double *c[])
 
     coords = f.function_space().mesh().coordinates
 
-    op2.par_loop(populate_p0, f.cell_set,
-                 f.dat(op2.INC, f.cell_node_map()),
-                 coords.dat(op2.READ, coords.cell_node_map()))
+    with configure("hpc_code_gen", 1):
+        op2.par_loop(populate_p0, f.cell_set,
+                     f.dat(op2.INC, f.cell_node_map()),
+                     coords.dat(op2.READ, coords.cell_node_map()))
 
     g = assemble(f * dx)
 

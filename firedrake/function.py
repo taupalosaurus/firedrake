@@ -9,7 +9,6 @@ import coffee.base as ast
 
 from pyop2 import op2
 from pyop2.logger import warning
-from pyop2.configuration import configure
 
 from firedrake import expression as expression_t
 from firedrake import functionspace
@@ -371,15 +370,14 @@ class Function(ufl.Coefficient):
                                                 to_pts, to_element, fs, coords)
             args = [kernel, subset or self.cell_set,
                     dat(op2.WRITE, fs.cell_node_map()[op2.i[0]]),
-                    coords.dat(op2.READ, coords.cell_node_map())]
+                    coords.dat(op2.READ, coords.cell_node_map(), flatten=True)]
         else:
             raise RuntimeError(
                 "Attempting to evaluate an Expression which has no value.")
 
         for _, arg in expression._user_args:
             args.append(arg(op2.READ))
-        with configure("hpc_code_gen", 1):
-            op2.par_loop(*args)
+        op2.par_loop(*args)
 
     def _interpolate_python_kernel(self, expression, to_pts, to_element, fs, coords):
         """Produce a :class:`PyOP2.Kernel` wrapping the eval method on the
@@ -463,7 +461,7 @@ const double pi = 3.141592653589793;
 for (unsigned int %(d)s=0; %(d)s < %(dim)d; %(d)s++) {
   %(x)s[%(d)s] = 0;
   for (unsigned int %(i)s=0; %(i)s < %(xndof)d; %(i)s++) {
-        %(x)s[%(d)s] += %(X)s[%(k)s][%(i)s] * %(x_)s[%(i)s][%(d)s];
+        %(x)s[%(d)s] += %(X)s[%(k)s][%(i)s] * %(x_)s[%(i)s + %(d)s * %(xndof)d];
   };
 };
 
