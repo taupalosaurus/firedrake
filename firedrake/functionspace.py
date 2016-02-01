@@ -9,7 +9,8 @@ import coffee.base as ast
 
 from pyop2 import op2
 from pyop2.caching import ObjectCached
-from pyop2.utils import flatten
+from pyop2.utils import flatten, transpose
+from pyop2.configuration import configuration
 
 from firedrake.petsc import PETSc
 from firedrake import dmplex
@@ -396,13 +397,21 @@ class FunctionSpaceBase(ObjectCached):
             else:
                 new_entity_node_list = entity_node_list
 
+            transposed_offsets = None
+            if entity_set._extruded:
+                transposed_offsets = transpose(new_entity_node_list,
+                                               self.fiat_element.entity_dofs(),
+                                               entity_set.layers - 1,
+                                               offset)
             val = op2.Map(entity_set, self.node_set,
                           map_arity,
                           new_entity_node_list,
                           ("%s_"+name) % (self.name),
                           offset,
                           parent,
-                          self.bt_masks)
+                          self.bt_masks,
+                          self.fiat_element.entity_dofs(),
+                          transposed_offsets=transposed_offsets)
             oh_snap(val, "is_interior", is_interior(self.fiat_element.entity_dofs()))
 
             if decorate:

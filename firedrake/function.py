@@ -371,7 +371,7 @@ class Function(ufl.Coefficient):
                                                 to_pts, to_element, fs, coords)
             args = [kernel, subset or self.cell_set,
                     dat(op2.WRITE, fs.cell_node_map()[op2.i[0]]),
-                    coords.dat(op2.READ, coords.cell_node_map(), flatten=configuration["hpc_code_gen"] == 2)]
+                    coords.dat(op2.READ, coords.cell_node_map(), flatten=(configuration["hpc_code_gen"] == 2))]
         else:
             raise RuntimeError(
                 "Attempting to evaluate an Expression which has no value.")
@@ -467,7 +467,7 @@ for (unsigned int %(d)s=0; %(d)s < %(dim)d; %(d)s++) {
 };
 
 """ % vals)
-        if configuration["hpc_code_gen"] == 2:
+        if configuration["hpc_code_gen"] in [2, 3]:
             block = ast.FlatBlock("""
 for (unsigned int %(d)s=0; %(d)s < %(dim)d; %(d)s++) {
   %(x)s[%(d)s] = 0;
