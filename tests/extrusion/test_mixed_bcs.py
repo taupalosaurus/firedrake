@@ -1,5 +1,6 @@
 from firedrake import *
 import pytest
+from pyop2.configuration import configuration
 
 
 @pytest.mark.parametrize('quadrilateral', [False, True])
@@ -151,11 +152,14 @@ def test_stokes_taylor_hood(nest):
     assert errornorm(p, pexact, degree_rise=0) < 1e-7
 
 
+@pytest.mark.xfail(configuration["hpc_code_gen"] == 3,
+                   reason="Explicit array lengths differ between MPI processes.")
 @pytest.mark.parallel
 def test_stokes_taylor_hood_parallel():
     test_stokes_taylor_hood(nest=True)
 
-
+@pytest.mark.xfail(configuration["hpc_code_gen"] == 3,
+                   reason="Explicit array lengths differ between MPI processes.")
 @pytest.mark.parallel
 def test_stokes_taylor_hood_parallel_monolithic():
     test_stokes_taylor_hood(nest=False)

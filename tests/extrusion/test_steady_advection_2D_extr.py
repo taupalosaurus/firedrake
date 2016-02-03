@@ -6,6 +6,9 @@ facet integrals.
 
 import pytest
 from firedrake import *
+from pyop2.configuration import configuration
+xfail = pytest.mark.xfail(configuration["hpc_code_gen"] in [3],
+                          reason="Explicit transposition requires explicit array lengths.")
 
 
 @pytest.fixture(scope='module')
@@ -72,6 +75,7 @@ def test_left_to_right(mesh, DG0, W):
     run_left_to_right(mesh, DG0, W)
 
 
+@xfail
 @pytest.mark.parallel
 def test_left_to_right_parallel():
     m = mesh()
@@ -111,6 +115,7 @@ def test_right_to_left(mesh, DG1, W):
     run_right_to_left(mesh, DG1, W)
 
 
+@xfail
 @pytest.mark.parallel
 def test_right_to_left_parallel():
     m = mesh()
@@ -150,6 +155,7 @@ def test_bottom_to_top(mesh, DG0, W):
     run_bottom_to_top(mesh, DG0, W)
 
 
+@xfail
 @pytest.mark.parallel
 def test_bottom_to_top_parallel():
     m = mesh()
@@ -189,6 +195,7 @@ def test_top_to_bottom(mesh, DG1, W):
     run_top_to_bottom(mesh, DG1, W)
 
 
+@xfail
 @pytest.mark.parallel
 def test_top_to_bottom_parallel():
     m = mesh()

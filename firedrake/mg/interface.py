@@ -23,7 +23,7 @@ def prolong(coarse, fine):
     op2.par_loop(hierarchy._prolong_kernel,
                  hierarchy._cell_sets[lvl],
                  fine.dat(op2.WRITE, hierarchy.cell_node_map(lvl)[op2.i[0]]),
-                 coarse.dat(op2.READ, coarse.cell_node_map()))
+                 coarse.dat(op2.READ, coarse.cell_node_map(), flatten=True))
 
 
 def restrict(fine, coarse):
@@ -61,7 +61,7 @@ def restrict(fine, coarse):
         hierarchy._restriction_weights = weights
 
     args = [coarse.dat(op2.INC, coarse.cell_node_map()[op2.i[0]]),
-            fine.dat(op2.READ, hierarchy.cell_node_map(lvl))]
+            fine.dat(op2.READ, hierarchy.cell_node_map(lvl), flatten=True)]
 
     if not hierarchy._discontinuous:
         weight = weights[lvl+1]

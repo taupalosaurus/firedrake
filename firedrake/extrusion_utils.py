@@ -159,7 +159,6 @@ def make_extruded_coords(extruded_topology, base_coords, ext_coords,
                     np.repeat(np.arange(layers-1, dtype=np.int32),
                               extruded_topology.cell_set.total_size).reshape(layers-1, extruded_topology.cell_set.total_size).T.ravel(), dtype=np.int32)
     height = op2.Global(1, layer_height, dtype=float)
-
     with configure("hpc_code_gen", 1):
         op2.par_loop(kernel,
                  ext_coords.cell_set,

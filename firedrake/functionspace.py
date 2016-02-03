@@ -397,12 +397,12 @@ class FunctionSpaceBase(ObjectCached):
             else:
                 new_entity_node_list = entity_node_list
 
-            transposed_offsets = None
+            transposed_offsets, correction, reps, xtrs = None, None, None, None
             if entity_set._extruded:
-                transposed_offsets = transpose(new_entity_node_list,
-                                               self.fiat_element.entity_dofs(),
-                                               entity_set.layers - 1,
-                                               offset)
+                transposed_offsets, correction, reps, xtrs = transpose(new_entity_node_list,
+                                                                       self.fiat_element.entity_dofs(),
+                                                                       entity_set.layers - 1,
+                                                                       offset)
             val = op2.Map(entity_set, self.node_set,
                           map_arity,
                           new_entity_node_list,
@@ -410,8 +410,10 @@ class FunctionSpaceBase(ObjectCached):
                           offset,
                           parent,
                           self.bt_masks,
-                          self.fiat_element.entity_dofs(),
-                          transposed_offsets=transposed_offsets)
+                          transposed_offsets=transposed_offsets,
+                          correction=correction,
+                          reps=reps,
+                          xtrs=xtrs)
             oh_snap(val, "is_interior", is_interior(self.fiat_element.entity_dofs()))
 
             if decorate:
@@ -503,11 +505,23 @@ class FunctionSpaceBase(ObjectCached):
             offset = self.offset[boundary_dofs[0]]
         else:
             offset = None
+
+        transposed_offsets, correction, reps, xtrs = None, None, None, None
+        # print self.fiat_element.entity_dofs()
+        if facet_set._extruded:
+            transposed_offsets, correction, reps, xtrs = transpose(facet_dat.data_ro_with_halos,
+                                                                   self.fiat_element.entity_dofs(),
+                                                                   facet_set.layers - 1,
+                                                                   offset)
         return op2.Map(facet_set, self.node_set,
                        nodes_per_facet,
                        facet_dat.data_ro_with_halos,
                        name="exterior_facet_boundary_node",
-                       offset=offset)
+                       offset=offset,
+                       transposed_offsets=transposed_offsets,
+                       correction=correction,
+                       reps=reps,
+                       xtrs=xtrs)
 
     @property
     def shape(self):

@@ -2,6 +2,9 @@ from firedrake import *
 import pytest
 import numpy as np
 import itertools
+from pyop2.configuration import configuration
+xfail = pytest.mark.xfail(configuration["hpc_code_gen"] in [3],
+                          reason="Explicit transposition requires explicit array lengths.")
 
 
 def run_prolongation(mtype, vector, space, degree):
@@ -156,48 +159,56 @@ def test_extruded_prolongation(mtype, vector, space, degree):
     run_extruded_prolongation(mtype, vector, space, degree)
 
 
+@xfail
 @pytest.mark.parallel(nprocs=2)
 def test_extruded_dg_prolongation_square_parallel():
     for d in range(0, 3):
         run_extruded_prolongation("square", False, "DG", d)
 
 
+@xfail
 @pytest.mark.parallel(nprocs=2)
 def test_extruded_vector_dg_prolongation_square_parallel():
     for d in range(0, 3):
         run_extruded_prolongation("square", True, "DG", d)
 
 
+@xfail
 @pytest.mark.parallel(nprocs=2)
 def test_extruded_cg_prolongation_square_parallel():
     for d in range(1, 4):
         run_extruded_prolongation("square", False, "CG", d)
 
 
+@xfail
 @pytest.mark.parallel(nprocs=2)
 def test_extruded_vector_cg_prolongation_square_parallel():
     for d in range(1, 4):
         run_extruded_prolongation("square", True, "CG", d)
 
 
+@xfail
 @pytest.mark.parallel(nprocs=2)
 def test_extruded_dg_prolongation_interval_parallel():
     for d in range(0, 3):
         run_extruded_prolongation("interval", False, "DG", d)
 
 
+@xfail
 @pytest.mark.parallel(nprocs=2)
 def test_extruded_vector_dg_prolongation_interval_parallel():
     for d in range(0, 3):
         run_extruded_prolongation("interval", True, "DG", d)
 
 
+@xfail
 @pytest.mark.parallel(nprocs=2)
 def test_extruded_cg_prolongation_interval_parallel():
     for d in range(1, 4):
         run_extruded_prolongation("interval", False, "CG", d)
 
 
+@xfail
 @pytest.mark.parallel(nprocs=2)
 def test_extruded_vector_cg_prolongation_interval_parallel():
     for d in range(1, 4):
@@ -236,6 +247,7 @@ def test_mixed_prolongation():
     run_mixed_prolongation()
 
 
+@xfail
 @pytest.mark.parallel(nprocs=2)
 def test_mixed_prolongation_parallel():
     run_mixed_prolongation()

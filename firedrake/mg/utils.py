@@ -309,11 +309,14 @@ def get_prolongation_kernel(fiat_element, unique_indices, dim=1):
     i = ast.Symbol("i", ())
     j = ast.Symbol("j", ())
     k = ast.Symbol("k", ())
+    coarse_idx = (j, k)
+    if configuration["hpc_code_gen"] == 3:
+        coarse_idx = (ast.Sum(j, ast.Prod(k, ast.c_sym(ncdof))),)
     if all_same:
-        assign = ast.Prod(ast.Symbol("coarse", (j, k)),
+        assign = ast.Prod(ast.Symbol("coarse", coarse_idx),
                           w_sym)
     else:
-        assign = ast.Prod(ast.Symbol("coarse", (j, k)),
+        assign = ast.Prod(ast.Symbol("coarse", coarse_idx),
                           ast.Symbol("weights", (i, j)))
 
     assignment = ast.Incr(ast.Symbol("fine", (ast.Sum(k, ast.Prod(i, ast.c_sym(dim))),)),
@@ -361,6 +364,10 @@ def get_restriction_kernel(fiat_element, unique_indices, dim=1, no_weights=False
     j = ast.Symbol("j", ())
     k = ast.Symbol("k", ())
     fine = ast.Symbol("fine", (j, k))
+    if configuration["hpc_code_gen"] == 3:
+        # Loop over k has size dim
+        # Loop over j has size nfdof
+        fine = ast.Symbol("fine", (ast.Sum(j, ast.Prod(k, ast.c_sym(nfdof))),))
     if no_weights:
         if all_ones:
             assign = fine
@@ -368,11 +375,11 @@ def get_restriction_kernel(fiat_element, unique_indices, dim=1, no_weights=False
             assign = ast.Prod(fine, ast.Symbol("weights", (i, j)))
     else:
         if all_ones:
-            assign = ast.Prod(fine, ast.Symbol("count_weights", (j, 0)))
+            assign = ast.Prod(fine, ast.Symbol("count_weights", (j,) if configuration["hpc_code_gen"] == 3 else (j, 0)))
         else:
             assign = ast.Prod(fine,
                               ast.Prod(ast.Symbol("weights", (i, j)),
-                                       ast.Symbol("count_weights", (j, 0))))
+                                       ast.Symbol("count_weights", (j,) if configuration["hpc_code_gen"] == 3 else (j, 0))))
     assignment = ast.Incr(ast.Symbol("coarse", (ast.Sum(k, ast.Prod(i, ast.c_sym(dim))),)),
                           assign)
     k_loop = ast.For(ast.Decl("int", k, ast.c_sym(0)),

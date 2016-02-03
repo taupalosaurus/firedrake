@@ -8,6 +8,8 @@ from . import impl
 from . import utils
 from .utils import set_level, get_level
 from . import interface
+from firedrake import fiat_utils
+from pyop2.utils import transpose
 
 
 __all__ = ["FunctionSpaceHierarchy", "VectorFunctionSpaceHierarchy",
@@ -112,10 +114,28 @@ class BaseHierarchy(object):
         c2f, vperm = self._mesh_hierarchy._cells_vperm[level]
 
         map_vals, offset = impl.create_cell_node_map(Vc, Vf, c2f, vperm)
+
+        transposed_offsets, correction, reps, xtrs = None, None, None, None
+        if self._cell_sets[level]._extruded:
+            # TODO: This has the pattern of a CG1xCG1 locally distributed set of entity dofs.
+            # Cannot deduce this now based on the fiat elements available at this point in the code.
+            # transposed_offsets, correction, reps, xtrs = transpose(map_vals,
+            #                                                        fiat_utils.fiat_from_ufl_element(self.ufl_element()).entity_dofs(),
+            #                                                        self._cell_sets[level].layers - 1,
+            #                                                        offset)
+            if len(offset) == 6:
+                transposed_offsets = [0, 0, 0, 0, 0, 0]
+                correction = [1.0, -1.0, 1.0, -1.0, 1.0, -1.0]
+                reps = [0, 2, 4]
+                xtrs = []
         map = op2.Map(self._cell_sets[level],
                       Vf.node_set,
                       map_vals.shape[1],
-                      map_vals, offset=offset)
+                      map_vals, offset=offset,
+                      transposed_offsets=transposed_offsets,
+                      correction=correction,
+                      reps=reps,
+                      xtrs=xtrs)
         self._map_cache[level] = map
         return map
 

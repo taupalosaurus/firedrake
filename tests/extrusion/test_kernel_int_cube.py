@@ -2,7 +2,7 @@ import pytest
 import numpy as np
 from firedrake import *
 import pyop2 as op2
-from pyop2.configuration import configure
+from pyop2.configuration import configuration
 
 
 def integrate_unit_cube(family, degree):
@@ -34,16 +34,17 @@ void comp_vol(double A[1], double *x[], double *y[])
 
     coords = f.function_space().mesh().coordinates
 
-    with configure("hpc_code_gen", 1):
-        op2.par_loop(volume, f.cell_set,
-                     g(op2.INC),
-                     coords.dat(op2.READ, coords.cell_node_map()),
-                     f.dat(op2.READ, f.cell_node_map())
-                    )
+    op2.par_loop(volume, f.cell_set,
+                 g(op2.INC),
+                 coords.dat(op2.READ, coords.cell_node_map()),
+                 f.dat(op2.READ, f.cell_node_map())
+                )
 
     return np.abs(g.data[0] - 1.0)
 
 
+@pytest.mark.skipif(configuration["hpc_code_gen"] in [2, 3],
+                    reason="Hand written kernels with [a][b] and b != 0.")
 def test_firedrake_extrusion_unit_cube():
     family = "Lagrange"
     degree = 1

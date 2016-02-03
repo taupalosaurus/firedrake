@@ -4,10 +4,14 @@ import pytest
 
 from firedrake import *
 from tests.common import longtest
+from pyop2.configuration import configuration
 
 cwd = abspath(dirname(__file__))
+xfail = pytest.mark.xfail(configuration["hpc_code_gen"] in [2, 3],
+                          reason="Hand written kernels with [a][b] and b != 0.")
 
 
+@xfail
 @pytest.fixture(params=[False, True])
 def mesh2d(request):
     periodic = request.param
@@ -18,6 +22,7 @@ def mesh2d(request):
     return ExtrudedMesh(m, 12)
 
 
+@xfail
 @pytest.fixture(params=[('cg', False),
                         ('cg', True),
                         ('dg', False),
@@ -36,12 +41,14 @@ def mesh3d(request):
     return ExtrudedMesh(m, 12)
 
 
+@xfail
 @pytest.fixture
 def cylinder_mesh():
     m = CircleManifoldMesh(16)
     return ExtrudedMesh(m, 12)
 
 
+@xfail
 @pytest.fixture(params=['triangle', 'quadrilateral'])
 def spherical_shell_mesh(request):
     if request.param == 'triangle':
@@ -51,6 +58,7 @@ def spherical_shell_mesh(request):
     return ExtrudedMesh(m, 12, layer_height=1.0/12, extrusion_type='radial')
 
 
+@xfail
 @pytest.fixture
 def func2d(mesh2d):
     V = FunctionSpace(mesh2d, "CG", 2)
@@ -58,6 +66,7 @@ def func2d(mesh2d):
     return f
 
 
+@xfail
 @pytest.fixture
 def func3d(mesh3d):
     V = FunctionSpace(mesh3d, "CG", 2)
@@ -65,18 +74,21 @@ def func3d(mesh3d):
     return f
 
 
+@xfail
 def test_2d(func2d):
     assert np.allclose(0.0000, func2d([0.10, 0.20]))
     assert np.allclose(0.4794, func2d([0.98, 0.94]))
     assert np.allclose(0.2464, func2d([0.72, 0.88]))
 
 
+@xfail
 def test_3d(func3d):
     assert np.allclose(0.00000, func3d([0.10, 0.20, 0.00]))
     assert np.allclose(0.48450, func3d([0.96, 0.02, 0.51]))
     assert np.allclose(0.05145, func3d([0.39, 0.57, 0.49]))
 
 
+@xfail
 @pytest.mark.xfail(run=False)
 def test_cylinder(cylinder_mesh):
     f = func3d(cylinder_mesh)
@@ -85,6 +97,7 @@ def test_cylinder(cylinder_mesh):
     assert np.allclose(0.68, f([0.36000000000, -0.64000000000, 1.0]))
 
 
+@xfail
 def test_spherical_shell(spherical_shell_mesh):
     f = func3d(spherical_shell_mesh)
     assert np.allclose(+0.2400000000, f([+0.69282032302, 0.69282032302, +0.69282032302]))

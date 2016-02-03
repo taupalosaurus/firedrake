@@ -3,7 +3,7 @@ import numpy as np
 from firedrake import *
 import pyop2 as op2
 import ufl
-from pyop2.configuration import configure
+from pyop2.configuration import configuration
 
 
 def integrate_rhs(family, degree):
@@ -33,16 +33,17 @@ void populate_tracer(double *x[], double *c[])
 
     coords = f.function_space().mesh().coordinates
 
-    with configure("hpc_code_gen", 1):
-        op2.par_loop(populate_p0, f.cell_set,
-                     f.dat(op2.INC, f.cell_node_map()),
-                     coords.dat(op2.READ, coords.cell_node_map()))
+    op2.par_loop(populate_p0, f.cell_set,
+                 f.dat(op2.INC, f.cell_node_map()),
+                 coords.dat(op2.READ, coords.cell_node_map()))
 
     g = assemble(f * dx)
 
     return np.abs(g - 0.5)
 
 
+@pytest.mark.skipif(configuration["hpc_code_gen"] in [2, 3],
+                    reason="Hand written kernels with [a][b] and b != 0.")
 def test_firedrake_extrusion_rhs():
     family = "DG"
     degree = 0

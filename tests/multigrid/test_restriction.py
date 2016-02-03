@@ -2,7 +2,9 @@ from firedrake import *
 import pytest
 import numpy as np
 import itertools
-
+from pyop2.configuration import configuration
+xfail = pytest.mark.xfail(configuration["hpc_code_gen"] in [3],
+                          reason="Explicit transposition requires explicit array lengths.")
 
 def run_restriction(mtype, vector, space, degree):
     if mtype == "interval":
@@ -51,48 +53,56 @@ def test_restriction(mtype, degree, vector, fs):
     run_restriction(mtype, vector, fs, degree)
 
 
+@xfail
 @pytest.mark.parallel(nprocs=2)
 def test_cg_restriction_square_parallel():
     for degree in range(1, 4):
         run_restriction("square", False, "CG", degree)
 
 
+@xfail
 @pytest.mark.parallel(nprocs=2)
 def test_dg_restriction_square_parallel():
     for degree in range(0, 3):
         run_restriction("square", False, "DG", degree)
 
 
+@xfail
 @pytest.mark.parallel(nprocs=2)
 def test_vector_cg_restriction_square_parallel():
     for degree in range(1, 4):
         run_restriction("square", True, "CG", degree)
 
 
+@xfail
 @pytest.mark.parallel(nprocs=2)
 def test_vector_dg_restriction_square_parallel():
     for degree in range(0, 3):
         run_restriction("square", True, "DG", degree)
 
 
+@xfail
 @pytest.mark.parallel(nprocs=2)
 def test_cg_restriction_interval_parallel():
     for degree in range(1, 4):
         run_restriction("interval", False, "CG", degree)
 
 
+@xfail
 @pytest.mark.parallel(nprocs=2)
 def test_dg_restriction_interval_parallel():
     for degree in range(0, 3):
         run_restriction("interval", False, "DG", degree)
 
 
+@xfail
 @pytest.mark.parallel(nprocs=2)
 def test_vector_cg_restriction_interval_parallel():
     for degree in range(1, 4):
         run_restriction("interval", True, "CG", degree)
 
 
+@xfail
 @pytest.mark.parallel(nprocs=2)
 def test_vector_dg_restriction_interval_parallel():
     for degree in range(0, 3):
@@ -148,48 +158,56 @@ def test_extruded_restriction(mtype, vector, space, degree):
     run_extruded_restriction(mtype, vector, space, degree)
 
 
+@xfail
 @pytest.mark.parallel(nprocs=2)
 def test_extruded_dg_restriction_square_parallel():
     for d in range(0, 3):
         run_extruded_restriction("square", False, "DG", d)
 
 
+@xfail
 @pytest.mark.parallel(nprocs=2)
 def test_extruded_vector_dg_restriction_square_parallel():
     for d in range(0, 3):
         run_extruded_restriction("square", True, "DG", d)
 
 
+@xfail
 @pytest.mark.parallel(nprocs=2)
 def test_extruded_cg_restriction_square_parallel():
     for d in range(1, 4):
         run_extruded_restriction("square", False, "CG", d)
 
 
+@xfail
 @pytest.mark.parallel(nprocs=2)
 def test_extruded_vector_cg_restriction_square_parallel():
     for d in range(1, 4):
         run_extruded_restriction("square", True, "CG", d)
 
 
+@xfail
 @pytest.mark.parallel(nprocs=2)
 def test_extruded_dg_restriction_interval_parallel():
     for d in range(0, 3):
         run_extruded_restriction("interval", False, "DG", d)
 
 
+@xfail
 @pytest.mark.parallel(nprocs=2)
 def test_extruded_vector_dg_restriction_interval_parallel():
     for d in range(0, 3):
         run_extruded_restriction("interval", True, "DG", d)
 
 
+@xfail
 @pytest.mark.parallel(nprocs=2)
 def test_extruded_cg_restriction_interval_parallel():
     for d in range(1, 4):
         run_extruded_restriction("interval", False, "CG", d)
 
 
+@xfail
 @pytest.mark.parallel(nprocs=2)
 def test_extruded_vector_cg_restriction_interval_parallel():
     for d in range(1, 4):
@@ -230,6 +248,7 @@ def test_mixed_restriction():
     run_mixed_restriction()
 
 
+@xfail
 @pytest.mark.parallel(nprocs=2)
 def test_mixed_restriction_parallel():
     run_mixed_restriction()
