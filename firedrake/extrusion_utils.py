@@ -61,6 +61,23 @@ def make_extruded_coords(extruded_topology, base_coords, ext_coords,
         }""" % {'base_map_arity': base_coords.cell_node_map().arity,
                 'base_coord_dim': base_coords.function_space().dim},
             "uniform_extrusion_kernel")
+        if configuration["hpc_code_gen"] in [2, 3]:
+            kernel = op2.Kernel("""
+        void uniform_extrusion_kernel(double *base_coords,
+                    double *ext_coords,
+                    int *layer,
+                    double *layer_height) {
+            for ( int d = 0; d < %(base_map_arity)d; d++ ) {
+                for ( int c = 0; c < %(base_coord_dim)d; c++ ) {
+                    ext_coords[2*d + c * 2*%(base_map_arity)d] = base_coords[d + c * %(base_map_arity)d];
+                    ext_coords[2*d+1 + c * 2*%(base_map_arity)d] = base_coords[d + c * %(base_map_arity)d];
+                }
+                ext_coords[2*d + %(base_coord_dim)d * 2*%(base_map_arity)d] = *layer_height * (layer[0]);
+                ext_coords[2*d+1 + %(base_coord_dim)d * 2*%(base_map_arity)d] = *layer_height * (layer[0] + 1);
+            }
+        }""" % {'base_map_arity': base_coords.cell_node_map().arity,
+                'base_coord_dim': base_coords.function_space().dim},
+            "uniform_extrusion_kernel")
     elif extrusion_type == 'radial':
         kernel = op2.Kernel("""
         void radial_extrusion_kernel(double **base_coords,
@@ -81,11 +98,66 @@ def make_extruded_coords(extruded_topology, base_coords, ext_coords,
         }""" % {'base_map_arity': base_coords.cell_node_map().arity,
                 'base_coord_dim': base_coords.function_space().dim},
             "radial_extrusion_kernel")
+        if configuration["hpc_code_gen"] in [2, 3]:
+            kernel = op2.Kernel("""
+        void radial_extrusion_kernel(double *base_coords,
+                   double *ext_coords,
+                   int *layer,
+                   double *layer_height) {
+            for ( int d = 0; d < %(base_map_arity)d; d++ ) {
+                double norm = 0.0;
+                for ( int c = 0; c < %(base_coord_dim)d; c++ ) {
+                    norm += base_coords[d + c * %(base_map_arity)d] * base_coords[d + c * %(base_map_arity)d];
+                }
+                norm = sqrt(norm);
+                for ( int c = 0; c < %(base_coord_dim)d; c++ ) {
+                    ext_coords[2*d + c * 2*%(base_map_arity)d] = base_coords[d + c * %(base_map_arity)d] * (1 + (*layer_height * layer[0])/norm);
+                    ext_coords[2*d+1 + c * 2*%(base_map_arity)d] = base_coords[d + c * %(base_map_arity)d] * (1 + (*layer_height * (layer[0]+1))/norm);
+                }
+            }
+        }""" % {'base_map_arity': base_coords.cell_node_map().arity,
+                'base_coord_dim': base_coords.function_space().dim},
+            "radial_extrusion_kernel")
     elif extrusion_type == 'radial_hedgehog':
         # Only implemented for interval in 2D and triangle in 3D.
         # gdim != tdim already checked in ExtrudedMesh constructor.
         if base_coords.cell().topological_dimension() not in [1, 2]:
             raise NotImplementedError("Hedgehog extrusion not implemented for %s" % base_coords.cell())
+
+        n_comp_2D = """
+                n[0] = -(base_coords[1][1] - base_coords[0][1]);
+                n[1] = base_coords[1][0] - base_coords[0][0];
+        """
+
+        n_comp_3D = """
+                    v0[i] = base_coords[1][i] - base_coords[0][i];
+                    v1[i] = base_coords[2][i] - base_coords[0][i];
+        """
+        x_comp = "base_coords[c][i];"
+
+        coords_comp = """
+                    ext_coords[2*d][c] = base_coords[d][c] + n[c] * layer_height[0] * layer[0][0] / norm;
+                    ext_coords[2*d+1][c] = base_coords[d][c] + n[c] * layer_height[0] * (layer[0][0] + 1) / norm;
+        """
+
+        if configuration["hpc_code_gen"] in [2, 3]:
+            n_comp_2D = """
+                n[0] = -(base_coords[1 + %(base_map_arity)s] - base_coords[%(base_map_arity)s]);
+                n[1] = base_coords[1] - base_coords[0];
+            """ % {'base_map_arity': base_coords.cell_node_map().arity}
+
+            n_comp_3D = """
+                    v0[i] = base_coords[1 + i * %(base_map_arity)s] - base_coords[i * %(base_map_arity)s];
+                    v1[i] = base_coords[2 + i * %(base_map_arity)s] - base_coords[i * %(base_map_arity)s];
+            """ % {'base_map_arity': base_coords.cell_node_map().arity}
+
+            x_comp = "base_coords[c + i * %(base_map_arity)s];" % {'base_map_arity': base_coords.cell_node_map().arity}
+
+            coords_comp = """
+                    ext_coords[2*d + c * 2*%(base_map_arity)d] = base_coords[d + c * %(base_map_arity)d] + n[c] * layer_height[0] * layer[0] / norm;
+                    ext_coords[2*d+1+ c * 2*%(base_map_arity)d] = base_coords[d + c * %(base_map_arity)d] + n[c] * layer_height[0] * (layer[0] + 1) / norm;
+            """ % {'base_map_arity': base_coords.cell_node_map().arity}
+
         kernel = op2.Kernel("""
         void radial_hedgehog_extrusion_kernel(double **base_coords,
                                               double **ext_coords,
@@ -104,8 +176,7 @@ def make_extruded_coords(extruded_topology, base_coords, ext_coords,
                  * (0 -1) (x2 - x1)
                  * (1  0) (y2 - y1)
                  */
-                n[0] = -(base_coords[1][1] - base_coords[0][1]);
-                n[1] = base_coords[1][0] - base_coords[0][0];
+                %(n_comp_two)s
             } else if (%(base_coord_dim)d == 3) {
                 /*
                  * normal is
@@ -118,8 +189,7 @@ def make_extruded_coords(extruded_topology, base_coords, ext_coords,
                  *    v1
                  */
                 for (i = 0; i < 3; ++i) {
-                    v0[i] = base_coords[1][i] - base_coords[0][i];
-                    v1[i] = base_coords[2][i] - base_coords[0][i];
+                    %(n_comp_three)s
                 }
                 n[0] = v0[1] * v1[2] - v0[2] * v1[1];
                 n[1] = v0[2] * v1[0] - v0[0] * v1[2];
@@ -127,7 +197,7 @@ def make_extruded_coords(extruded_topology, base_coords, ext_coords,
             }
             for (i = 0; i < %(base_map_arity)d; ++i) {
                 for (c = 0; c < %(base_coord_dim)d; ++c) {
-                    x[i] += base_coords[c][i];
+                    %(x_comp)s
                 }
             }
             for (i = 0; i < %(base_map_arity)d; ++i) {
@@ -141,12 +211,15 @@ def make_extruded_coords(extruded_topology, base_coords, ext_coords,
             norm *= (dot < 0 ? -1 : 1);
             for (d = 0; d < %(base_map_arity)d; ++d) {
                 for (c = 0; c < %(base_coord_dim)d; ++c ) {
-                    ext_coords[2*d][c] = base_coords[d][c] + n[c] * layer_height[0] * layer[0][0] / norm;
-                    ext_coords[2*d+1][c] = base_coords[d][c] + n[c] * layer_height[0] * (layer[0][0] + 1)/ norm;
+                    %(coords_comp)s
                 }
             }
         }""" % {'base_map_arity': base_coords.cell_node_map().arity,
-                'base_coord_dim': base_coords.function_space().dim},
+                'base_coord_dim': base_coords.function_space().dim,
+                'n_comp_two': n_comp_2D,
+                'n_comp_three': n_comp_3D,
+                'x_comp': x_comp,
+                'coords_comp': coords_comp},
             "radial_hedgehog_extrusion_kernel")
     else:
         raise NotImplementedError('Unsupported extrusion type "%s"' % extrusion_type)
@@ -159,10 +232,10 @@ def make_extruded_coords(extruded_topology, base_coords, ext_coords,
                     np.repeat(np.arange(layers-1, dtype=np.int32),
                               extruded_topology.cell_set.total_size).reshape(layers-1, extruded_topology.cell_set.total_size).T.ravel(), dtype=np.int32)
     height = op2.Global(1, layer_height, dtype=float)
-    with configure("hpc_code_gen", 1):
-        op2.par_loop(kernel,
-                 ext_coords.cell_set,
-                 base_coords.dat(op2.READ, base_coords.cell_node_map()),
-                 ext_coords.dat(op2.WRITE, ext_coords.cell_node_map()),
-                 layer(op2.READ, layer_fs.cell_node_map()),
-                 height(op2.READ))
+    flatten = configuration["hpc_code_gen"] in [2, 3]
+    op2.par_loop(kernel,
+             ext_coords.cell_set,
+             base_coords.dat(op2.READ, base_coords.cell_node_map(), flatten=flatten),
+             ext_coords.dat(op2.WRITE, ext_coords.cell_node_map(), flatten=flatten),
+             layer(op2.READ, layer_fs.cell_node_map(), flatten=flatten),
+             height(op2.READ))
