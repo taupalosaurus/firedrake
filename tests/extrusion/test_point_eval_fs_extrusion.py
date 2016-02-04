@@ -1,6 +1,7 @@
 from os.path import abspath, dirname
 import numpy as np
 import pytest
+from pyop2.configuration import configuration
 
 from firedrake import *
 
