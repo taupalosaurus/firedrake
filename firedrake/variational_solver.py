@@ -168,7 +168,6 @@ class NonlinearVariationalSolver(object):
         # User might have updated parameters dict before calling
         # solve, ensure these are passed through to the snes.
         solving_utils.update_parameters(self, self.snes)
-
         with self._problem.u.dat.vec as v:
             self.snes.solve(None, v)
 

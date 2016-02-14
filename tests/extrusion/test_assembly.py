@@ -21,6 +21,7 @@ def test_scalar_assembly(hfamily, hdegree, vfamily, vdegree):
 
     assemble(u*v*dx).M._force_evaluation()
     assemble(dot(grad(u), grad(v))*dx).M._force_evaluation()
+    print "DONE!!!"
 
 
 # three valid combinations for hdiv: 1) hdiv x DG, 2) hcurl x DG, 3) DG x CG

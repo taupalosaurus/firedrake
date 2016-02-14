@@ -231,6 +231,7 @@ def make_extruded_coords(extruded_topology, base_coords, ext_coords,
     layer = op2.Dat(layer_fs.dof_dset,
                     np.repeat(np.arange(layers-1, dtype=np.int32),
                               extruded_topology.cell_set.total_size).reshape(layers-1, extruded_topology.cell_set.total_size).T.ravel(), dtype=np.int32)
+    layer.transposed=False
     height = op2.Global(1, layer_height, dtype=float)
     flatten = configuration["hpc_code_gen"] in [2, 3]
     op2.par_loop(kernel,

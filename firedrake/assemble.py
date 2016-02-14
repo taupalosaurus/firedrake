@@ -277,6 +277,7 @@ def _assemble(f, tensor=None, bcs=None, form_compiler_parameters=None,
                                           flatten=True))
 
                     try:
+                        print "ASSEMBLE 1"
                         op2.par_loop(*args)
                     except MapValueError:
                         raise RuntimeError("Integral measure does not match measure of all coefficients/arguments")
@@ -305,6 +306,7 @@ def _assemble(f, tensor=None, bcs=None, form_compiler_parameters=None,
                                           flatten=True))
                     args.append(m.exterior_facets.local_facet_dat(op2.READ))
                     try:
+                        print "ASSEMBLE 2"
                         op2.par_loop(*args)
                     except MapValueError:
                         raise RuntimeError("Integral measure does not match measure of all coefficients/arguments")
@@ -341,6 +343,7 @@ def _assemble(f, tensor=None, bcs=None, form_compiler_parameters=None,
                             args.append(c.dat(op2.READ, c.cell_node_map(),
                                               flatten=True))
                         try:
+                            print "ASSEMBLE 3"
                             op2.par_loop(*args, iterate=index)
                         except MapValueError:
                             raise RuntimeError("Integral measure does not match measure of all coefficients/arguments")
@@ -367,6 +370,7 @@ def _assemble(f, tensor=None, bcs=None, form_compiler_parameters=None,
                                           flatten=True))
                     args.append(m.interior_facets.local_facet_dat(op2.READ))
                     try:
+                        print "ASSEMBLE 4"
                         op2.par_loop(*args)
                     except MapValueError:
                         raise RuntimeError("Integral measure does not match measure of all coefficients/arguments")
@@ -396,6 +400,7 @@ def _assemble(f, tensor=None, bcs=None, form_compiler_parameters=None,
                         args.append(c.dat(op2.READ, c.cell_node_map(),
                                           flatten=True))
                     try:
+                        print "ASSEMBLE 5"
                         op2.par_loop(*args, iterate=op2.ON_INTERIOR_FACETS)
                     except MapValueError:
                         raise RuntimeError("Integral measure does not match measure of all coefficients/arguments")

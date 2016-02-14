@@ -1,10 +1,13 @@
 from os.path import abspath, dirname
 import numpy as np
 import pytest
+from pyop2.configuration import configuration
 
 from firedrake import *
 
 cwd = abspath(dirname(__file__))
+xfail = pytest.mark.xfail(configuration["hpc_code_gen"] in [2, 3],
+                          reason="Hand written kernels with [a][b] and b != 0.")
 
 
 @pytest.fixture
@@ -38,6 +41,7 @@ def mesh_tetrahedron():
     return m
 
 
+@xfail
 @pytest.mark.parametrize(('family', 'degree'),
                          [('CG', 2),
                           ('DG', 2)])
@@ -48,6 +52,7 @@ def test_interval(mesh_interval, family, degree):
     assert np.allclose(0.25, f([1.0]))
 
 
+@xfail
 @pytest.mark.parametrize(('family', 'degree'),
                          [('CG', 2),
                           ('DG', 2)])
@@ -58,6 +63,7 @@ def test_interval_vector(mesh_interval, family, degree):
     assert np.allclose([0.25, 1.00], f([1.0]))
 
 
+@xfail
 @pytest.mark.parametrize(('family', 'degree'),
                          [('CG', 2),
                           ('DG', 2)])
@@ -68,6 +74,7 @@ def test_triangle(mesh_triangle, family, degree):
     assert np.allclose(-0.35, f([0.0, 0.9]))
 
 
+@xfail
 @pytest.mark.parametrize(('family', 'degree'),
                          [('CG', 1),
                           ('DG', 1),
@@ -88,6 +95,7 @@ def test_triangle_vector(mesh_triangle, family, degree):
     assert np.allclose([1.1, 0.18], f([0.0, 0.9]))
 
 
+@xfail
 @pytest.mark.parametrize(('family', 'degree'),
                          [('CG', 1),
                           ('DG', 1)])
@@ -99,6 +107,7 @@ def test_triangle_tensor(mesh_triangle, family, degree):
     assert np.allclose([[0.9, 0.2], [0.00, 0.18]], f([0.0, 0.9]))
 
 
+@xfail
 def test_triangle_mixed(mesh_triangle):
     V1 = FunctionSpace(mesh_triangle, "DG", 1)
     V2 = FunctionSpace(mesh_triangle, "RT", 2)
@@ -126,6 +135,7 @@ def test_triangle_mixed(mesh_triangle):
     assert np.allclose([0.5, 1.1], actual[2][1])
 
 
+@xfail
 @pytest.mark.parametrize(('family', 'degree'),
                          [('CG', 2),
                           ('DG', 2)])
@@ -136,6 +146,7 @@ def test_quadrilateral(mesh_quadrilateral, family, degree):
     assert np.allclose(-0.35, f([0.0, 0.9]))
 
 
+@xfail
 @pytest.mark.parametrize(('family', 'degree'),
                          [('CG', 1),
                           ('DG', 1),
@@ -153,6 +164,7 @@ def test_quadrilateral_vector(mesh_quadrilateral, family, degree):
     assert np.allclose([1.1, 0.18], f([0.0, 0.9]))
 
 
+@xfail
 @pytest.mark.parametrize(('family', 'degree'),
                          [('CG', 2),
                           ('DG', 2)])
@@ -163,6 +175,7 @@ def test_tetrahedron(mesh_tetrahedron, family, degree):
     assert np.allclose(-0.06, f([0.4, 0.7, 0.1]))
 
 
+@xfail
 @pytest.mark.parametrize(('family', 'degree'),
                          [('CG', 1),
                           ('DG', 1),

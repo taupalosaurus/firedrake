@@ -143,6 +143,7 @@ def _solve_varproblem(*args, **kwargs):
         solver = vs.LinearVariationalSolver(problem, solver_parameters=solver_parameters,
                                             nullspace=nullspace,
                                             options_prefix=options_prefix)
+
         with progress(INFO, 'Solving linear variational problem'):
             solver.solve()
 

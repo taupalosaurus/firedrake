@@ -1,12 +1,16 @@
 from os.path import abspath, dirname
 import numpy as np
 import pytest
+from pyop2.configuration import configuration
 
 from firedrake import *
 
 cwd = abspath(dirname(__file__))
+xfail = pytest.mark.xfail(configuration["hpc_code_gen"] in [2, 3],
+                          reason="Hand written kernels with [a][b] and b != 0.")
 
 
+@xfail
 def test_1d_args():
     mesh = UnitIntervalMesh(1)
     f = mesh.coordinates
@@ -43,6 +47,7 @@ def test_1d_args():
     assert np.allclose([[0.2], [0.3]], f.at(np.array([[0.2], [0.3]])))
 
 
+@xfail
 def test_2d_args():
     mesh = UnitSquareMesh(1, 1)
     f = mesh.coordinates
@@ -76,6 +81,7 @@ def test_2d_args():
                                                                 [0.3, 0.5]])))
 
 
+@xfail
 def test_dont_raise():
     mesh = UnitIntervalMesh(1)
     V = FunctionSpace(mesh, "CG", 1)
@@ -93,6 +99,7 @@ def test_dont_raise():
     assert np.allclose([0.0, 1.0], actual[1:])
 
 
+@xfail
 def test_dont_raise_vector():
     mesh = UnitIntervalMesh(1)
     V = VectorFunctionSpace(mesh, "CG", 1, dim=2)
@@ -110,6 +117,7 @@ def test_dont_raise_vector():
     assert np.allclose([1.0, 2.0], actual[1])
 
 
+@xfail
 def test_dont_raise_mixed():
     mesh = UnitSquareMesh(1, 1)
     V1 = FunctionSpace(mesh, "DG", 1)
@@ -128,6 +136,7 @@ def test_dont_raise_mixed():
     assert f.at([1.2, 0.5], dont_raise=True) is None
 
 
+@xfail
 @pytest.mark.parallel(nprocs=3)
 def test_nascent_parallel_support():
     mesh = UnitSquareMesh(8, 8)

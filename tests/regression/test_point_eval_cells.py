@@ -1,10 +1,13 @@
 from os.path import abspath, dirname, join
 import numpy as np
 import pytest
+from pyop2.configuration import configuration
 
 from firedrake import *
 
 cwd = abspath(dirname(__file__))
+xfail = pytest.mark.xfail(configuration["hpc_code_gen"] in [2, 3],
+                          reason="Hand written kernels with [a][b] and b != 0.")
 
 
 @pytest.fixture(params=[False, True])
@@ -72,24 +75,28 @@ def func3d(mesh3d):
     return f
 
 
+@xfail
 def test_1d(func1d):
     assert np.allclose(0.09, func1d([0.1]))
     assert np.allclose(0.25, func1d([0.5]))
     assert np.allclose(0.24, func1d([0.6]))
 
 
+@xfail
 def test_2d(func2d):
     assert np.allclose(0.0000, func2d([0.10, 0.20]))
     assert np.allclose(0.4794, func2d([0.98, 0.94]))
     assert np.allclose(0.2464, func2d([0.72, 0.88]))
 
 
+@xfail
 def test_3d(func3d):
     assert np.allclose(0.00000, func3d([0.10, 0.20, 0.00]))
     assert np.allclose(0.48450, func3d([0.96, 0.02, 0.51]))
     assert np.allclose(0.05145, func3d([0.39, 0.57, 0.49]))
 
 
+@xfail
 @pytest.mark.xfail(run=False)
 def test_circle(circle_mesh):
     f = func2d(circle_mesh)
@@ -98,6 +105,7 @@ def test_circle(circle_mesh):
     assert np.allclose(-0.4352, f([0.36000000000, -0.64000000000]))
 
 
+@xfail
 @pytest.mark.xfail(run=False)
 def test_sphere(sphere_mesh):
     f = func3d(sphere_mesh)

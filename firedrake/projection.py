@@ -92,7 +92,6 @@ def project(v, V, bcs=None, mesh=None,
     else:
         solver_parameters.setdefault('ksp_type', 'cg')
         solver_parameters.setdefault('ksp_rtol', 1e-8)
-
     _solve(a == L, ret, bcs=bcs,
            solver_parameters=solver_parameters,
            form_compiler_parameters=form_compiler_parameters)
