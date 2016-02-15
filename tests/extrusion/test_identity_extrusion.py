@@ -14,7 +14,7 @@ params = {'snes_type': 'ksponly', 'ksp_type': 'preonly', 'pc_type': 'lu'}
 
 @pytest.mark.parametrize(('hfamily', 'hdegree', 'vfamily', 'vdegree'),
                          [(f, d, vf, vd) for (vf, vd) in CG + DG for (f, d) in CG + DG])
-def xtest_identity_scalar(hfamily, hdegree, vfamily, vdegree):
+def test_identity_scalar(hfamily, hdegree, vfamily, vdegree):
     mesh = extmesh(4, 4, 2)
     fspace = FunctionSpace(mesh, hfamily, hdegree, vfamily=vfamily, vdegree=vdegree)
 
