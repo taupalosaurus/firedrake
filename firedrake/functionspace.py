@@ -257,7 +257,6 @@ class FunctionSpaceBase(ObjectCached):
             parent = None
 
         offset = self.cell_node_map().offset
-        from IPython import embed; embed()
         map = self._map_cache(self._interior_facet_map_cache,
                               self._mesh.interior_facets.set,
                               self.interior_facet_node_list,
