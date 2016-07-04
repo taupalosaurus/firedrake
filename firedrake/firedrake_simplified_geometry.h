@@ -68,13 +68,13 @@ coefficients below.*/
 #define compute_jacobian_prism_3d(J, coordinate_dofs) \
   J[0] = 0.5*(coordinate_dofs[2] + coordinate_dofs[3] - coordinate_dofs[0] - coordinate_dofs[1]); \
   J[1] = 0.5*(coordinate_dofs[4] + coordinate_dofs[5] - coordinate_dofs[0] - coordinate_dofs[1]); \
-  J[2] = (coordinate_dofs[1] + coordinate_dofs[3] + coordinate_dofs[5] - coordinate_dofs[0] - coordinate_dofs[2] - coordinate_dofs[4])/3.0; \
+  J[2] = (coordinate_dofs[1] + coordinate_dofs[3] + coordinate_dofs[5] - coordinate_dofs[0] - coordinate_dofs[2] - coordinate_dofs[4])*(1.0/3.0); \
   J[3] = 0.5*(coordinate_dofs[8] + coordinate_dofs[9] - coordinate_dofs[6] - coordinate_dofs[7]); \
   J[4] = 0.5*(coordinate_dofs[10] + coordinate_dofs[11] - coordinate_dofs[6] - coordinate_dofs[7]); \
-  J[5] = (coordinate_dofs[7] + coordinate_dofs[9] + coordinate_dofs[11] - coordinate_dofs[6] - coordinate_dofs[8] - coordinate_dofs[10])/3.0; \
+  J[5] = (coordinate_dofs[7] + coordinate_dofs[9] + coordinate_dofs[11] - coordinate_dofs[6] - coordinate_dofs[8] - coordinate_dofs[10])*(1.0/3.0); \
   J[6] = 0.5*(coordinate_dofs[14] + coordinate_dofs[15] - coordinate_dofs[12] - coordinate_dofs[13]); \
   J[7] = 0.5*(coordinate_dofs[16] + coordinate_dofs[17] - coordinate_dofs[12] - coordinate_dofs[13]); \
-  J[8] = (coordinate_dofs[13] + coordinate_dofs[15] + coordinate_dofs[17] - coordinate_dofs[12] - coordinate_dofs[14] - coordinate_dofs[16])/3.0;
+  J[8] = (coordinate_dofs[13] + coordinate_dofs[15] + coordinate_dofs[17] - coordinate_dofs[12] - coordinate_dofs[14] - coordinate_dofs[16])*(1.0/3.0);
 
 /* Compute Jacobian J for tensor product hexahedron embedded in R^3 */
 /* Explanation: the CG1 x CG1 basis functions are, in order, (1-X)(1-Y)(1-Z),
@@ -156,13 +156,13 @@ evaluated at the midpoint (1/2, 1/2, 1/2). This gives the coefficients below. */
 #define compute_jacobian_prism_int_3d(J, coordinate_dofs) \
   J[0] = 0.5*(coordinate_dofs[2] + coordinate_dofs[3] - coordinate_dofs[0] - coordinate_dofs[1]); \
   J[1] = 0.5*(coordinate_dofs[4] + coordinate_dofs[5] - coordinate_dofs[0] - coordinate_dofs[1]); \
-  J[2] = (coordinate_dofs[1] + coordinate_dofs[3] + coordinate_dofs[5] - coordinate_dofs[0] - coordinate_dofs[2] - coordinate_dofs[4])/3.0; \
+  J[2] = (coordinate_dofs[1] + coordinate_dofs[3] + coordinate_dofs[5] - coordinate_dofs[0] - coordinate_dofs[2] - coordinate_dofs[4])*(1.0/3.0); \
   J[3] = 0.5*(coordinate_dofs[14] + coordinate_dofs[15] - coordinate_dofs[12] - coordinate_dofs[13]); \
   J[4] = 0.5*(coordinate_dofs[16] + coordinate_dofs[17] - coordinate_dofs[12] - coordinate_dofs[13]); \
-  J[5] = (coordinate_dofs[13] + coordinate_dofs[15] + coordinate_dofs[17] - coordinate_dofs[12] - coordinate_dofs[14] - coordinate_dofs[16])/3.0; \
+  J[5] = (coordinate_dofs[13] + coordinate_dofs[15] + coordinate_dofs[17] - coordinate_dofs[12] - coordinate_dofs[14] - coordinate_dofs[16])*(1.0/3.0); \
   J[6] = 0.5*(coordinate_dofs[26] + coordinate_dofs[27] - coordinate_dofs[24] - coordinate_dofs[25]); \
   J[7] = 0.5*(coordinate_dofs[28] + coordinate_dofs[29] - coordinate_dofs[24] - coordinate_dofs[25]); \
-  J[8] = (coordinate_dofs[25] + coordinate_dofs[27] + coordinate_dofs[29] - coordinate_dofs[24] - coordinate_dofs[26] - coordinate_dofs[28])/3.0;
+  J[8] = (coordinate_dofs[25] + coordinate_dofs[27] + coordinate_dofs[29] - coordinate_dofs[24] - coordinate_dofs[26] - coordinate_dofs[28])*(1.0/3.0);
 
 /* Compute Jacobian J for tensor product hexahedron embedded in R^3 */
 #define compute_jacobian_hex_int_3d(J, coordinate_dofs) \
