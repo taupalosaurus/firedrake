@@ -149,13 +149,13 @@ Citations().add("Luporini2015", """
 }
 """)
 
-Citations().add("Luporini2016", """
-@article{Luporini2016,
+Citations().add("Luporini2017", """
+@article{Luporini2017,
   author =       {Fabio Luporini and David A. Ham and Paul H. J. Kelly},
   title =        {An algorithm for the optimization of finite element
                   integration loops},
-  journal =      {Submitted to ACM TOMS},
-  year =         2016,
+  journal =      {To appear in ACM TOMS},
+  year =         2017,
   archiveprefix ={arXiv},
   eprint =       {1604.05872},
   url =          {http://arxiv.org/abs/1604.05872}
