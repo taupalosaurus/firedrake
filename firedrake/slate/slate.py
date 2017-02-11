@@ -129,6 +129,9 @@ class TensorBase(with_metaclass(ABCMeta)):
     def T(self):
         return Transpose(self)
 
+    def solve(self, rhs):
+        return Solve(self, rhs)
+
     def __add__(self, other):
         if isinstance(other, TensorBase):
             return Add(self, other)
@@ -610,11 +613,41 @@ class Action(TensorOp):
         return (type(self), self.operands, self.actee)
 
 
+class Solve(TensorOp):
+    """
+    """
+
+    def __init__(self, LHS, RHS, eigen_parameters=None):
+        """Constructor for the Solve class."""
+        assert LHS.shape[0] == LHS.shape[1], (
+            "Can only solve square systems for now."
+        )
+        super(Solve, self).__init__(LHS, RHS)
+        self.eigen_parameters = eigen_parameters
+
+    def arguments(self):
+        """Returns a tuple of arguments associated with the tensor."""
+        lhs, rhs = self.operands
+        symbolic = lhs.inv * rhs
+        return symbolic.arguments()
+
+    def _output_string(self, prec=None):
+        """Creates a string representation."""
+        A, b = self.operands
+        return "Solve(%s, %s)" % (A, b)
+
+    def __repr__(self):
+        """Slate representation of the action of a tensor on a coefficient."""
+        A, b = self.operands
+        return "Solve(%r, %r)" % (A, b)
+
+
 # Establishes levels of precedence for Slate tensors
 precedences = [
     [UnaryOp],
     [Add, Sub],
-    [Mul, Action]
+    [Mul, Action],
+    [Solve]
 ]
 
 # Here we establish the precedence class attribute for a given
