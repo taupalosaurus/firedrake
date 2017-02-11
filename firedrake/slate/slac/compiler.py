@@ -23,9 +23,11 @@ from collections import OrderedDict
 
 from firedrake.constant import Constant
 from firedrake.tsfc_interface import SplitKernel, KernelInfo
-from firedrake.slate.slate import (TensorBase, Transpose, Inverse,
-                                   Negative, Add, Sub, Mul,
-                                   Action)
+from firedrake.slate.slate import (TensorBase, Transpose,
+                                   Inverse, Negative,
+                                   Add, Sub,
+                                   Mul, Action,
+                                   Solve)
 from firedrake.slate.slac.kernel_builder import KernelBuilder
 from firedrake import op2
 
@@ -644,6 +646,22 @@ def metaphrase_slate_to_cpp(expr, temps, prec=None):
         result = "(%s) * %s" % (metaphrase_slate_to_cpp(tensor,
                                                         temps,
                                                         expr.prec), temps[c])
+        return parenthesize(result, expr.prec, prec)
+
+    elif isinstance(expr, Solve):
+        A, b = expr.operands
+        if expr.eigen_parameters:
+            fact = expr.eigen_parameters
+        else:
+            fact = "colPivHouseholderQr"
+
+        result = "(%s).%s().solve(%s)" % (metaphrase_slate_to_cpp(A,
+                                                                  temps,
+                                                                  expr.prec),
+                                          fact,
+                                          metaphrase_slate_to_cpp(b,
+                                                                  temps,
+                                                                  expr.prec))
         return parenthesize(result, expr.prec, prec)
 
     else:
