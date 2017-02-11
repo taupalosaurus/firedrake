@@ -29,6 +29,7 @@ from firedrake.slate.slate import (TensorBase, Transpose,
                                    Mul, Action,
                                    Solve)
 from firedrake.slate.slac.kernel_builder import KernelBuilder
+from firedrake.slate.slac.parameters import default_parameters
 from firedrake import op2
 
 from pyop2.utils import get_petsc_dir
@@ -55,12 +56,17 @@ supported_integral_types = [
 ]
 
 
-def compile_expression(slate_expr, tsfc_parameters=None):
+def compile_expression(slate_expr,
+                       eigen_parameters=None,
+                       tsfc_parameters=None):
     """Takes a Slate expression `slate_expr` and returns the appropriate
     :class:`firedrake.op2.Kernel` object representing the Slate expression.
 
-    :arg slate_expr: a :class:'TensorBase' expression.
-    :arg tsfc_parameters: an optional `dict` of form compiler parameters to
+    :arg slate_expr: a :class:`TensorBase` expression.
+    :arg eigen_parameters: an optional ``dict`` of parameters to be passed
+                           onto any solve nodes in Slate for element linear
+                           algebra solves.
+    :arg tsfc_parameters: an optional ``dict`` of form compiler parameters to
                           be passed onto TSFC during the compilation of
                           ufl forms.
 
@@ -79,6 +85,9 @@ def compile_expression(slate_expr, tsfc_parameters=None):
     # simply reuse the produced kernel.
     if slate_expr._metakernel_cache is not None:
         return slate_expr._metakernel_cache
+
+    if eigen_parameters is None:
+        eigen_parameters = default_parameters()
 
     # Initialize coefficients, shape and statements list
     expr_coeffs = slate_expr.coefficients()
@@ -213,7 +222,8 @@ def compile_expression(slate_expr, tsfc_parameters=None):
     # coefficient
     if bool(builder.aux_exprs):
         # The declared temps will be updated within this method
-        aux_statements = auxiliary_temporaries(builder, declared_temps)
+        aux_statements = auxiliary_temporaries(builder, declared_temps,
+                                               eigen_parameters)
         statements.extend(aux_statements)
 
     # Now we create the result statement by declaring its eigen type and
@@ -231,7 +241,8 @@ def compile_expression(slate_expr, tsfc_parameters=None):
     # Generate the complete c++ string performing the linear algebra operations
     # on Eigen matrices/vectors
     cpp_string = ast.FlatBlock(metaphrase_slate_to_cpp(slate_expr,
-                                                       declared_temps))
+                                                       declared_temps,
+                                                       eigen_parameters))
     statements.append(ast.Incr(result_sym, cpp_string))
 
     # Finalize AST for macro kernel construction
@@ -495,7 +506,7 @@ def facet_integral_loop(cxt_kernel, builder, coordsym, cellfacetsym,
     return loop_stmt, incl
 
 
-def auxiliary_temporaries(builder, declared_temps):
+def auxiliary_temporaries(builder, declared_temps, params):
     """This function generates auxiliary information regarding special
     handling of expressions that require creating additional temporaries.
 
@@ -505,6 +516,9 @@ def auxiliary_temporaries(builder, declared_temps):
                          declared and assigned values. This will be
                          updated in this method and referenced later
                          in the compiler.
+    :arg params: an optional ``dict`` of parameters to pass onto
+                 the eigen code generation for specifying any
+                 matrix factorizations.
     Returns: a list of auxiliary statements are returned that contain temporary
              declarations and any code-blocks needed to evaluate the
              expression.
@@ -514,7 +528,7 @@ def auxiliary_temporaries(builder, declared_temps):
         if isinstance(exp, Inverse):
             if builder._ref_counts[exp] > 1:
                 # Get the temporary for the particular expression
-                result = metaphrase_slate_to_cpp(exp, declared_temps)
+                result = metaphrase_slate_to_cpp(exp, declared_temps, params)
 
                 # Now we use the generated result and assign the value to the
                 # corresponding temporary.
@@ -594,13 +608,16 @@ def parenthesize(arg, prec=None, parent=None):
     return "(%s)" % arg
 
 
-def metaphrase_slate_to_cpp(expr, temps, prec=None):
+def metaphrase_slate_to_cpp(expr, temps, params, prec=None):
     """Translates a Slate expression into its equivalent representation in
     the Eigen C++ syntax.
 
     :arg expr: a :class:`slate.TensorBase` expression.
-    :arg temps: a `dict` of temporaries which map a given expression to its
+    :arg temps: a ``dict`` of temporaries which map a given expression to its
                 corresponding representation as a `coffee.Symbol` object.
+    :arg params: an optional ``dict`` of parameters to pass onto
+                 the eigen code generation for specifying any
+                 matrix factorizations.
     :arg prec: an argument dictating the order of precedence in the linear
                algebra operations. This ensures that parentheticals are placed
                appropriately and the order in which linear algebra operations
@@ -618,15 +635,32 @@ def metaphrase_slate_to_cpp(expr, temps, prec=None):
 
     elif isinstance(expr, Transpose):
         tensor, = expr.operands
-        return "(%s).transpose()" % metaphrase_slate_to_cpp(tensor, temps)
+        return "(%s).transpose()" % metaphrase_slate_to_cpp(tensor,
+                                                            temps,
+                                                            params)
 
     elif isinstance(expr, Inverse):
         tensor, = expr.operands
-        return "(%s).inverse()" % metaphrase_slate_to_cpp(tensor, temps)
+
+        if params.get("inverse_factor", None):
+            factorization = params.get("inverse_factor")
+            identity = "Matrix<double, %d, %d>::Identity()" % expr.shape
+            return "(%s).%s().solve(%s)" % (metaphrase_slate_to_cpp(tensor,
+                                                                    temps,
+                                                                    params),
+                                            factorization,
+                                            identity)
+        else:
+            return "(%s).inverse()" % metaphrase_slate_to_cpp(tensor,
+                                                              temps,
+                                                              params)
 
     elif isinstance(expr, Negative):
         tensor, = expr.operands
-        result = "-%s" % metaphrase_slate_to_cpp(tensor, temps, expr.prec)
+        result = "-%s" % metaphrase_slate_to_cpp(tensor,
+                                                 temps,
+                                                 params,
+                                                 expr.prec)
         return parenthesize(result, expr.prec, prec)
 
     elif isinstance(expr, (Add, Sub, Mul)):
@@ -634,33 +668,34 @@ def metaphrase_slate_to_cpp(expr, temps, prec=None):
               Sub: '-',
               Mul: '*'}[type(expr)]
         A, B = expr.operands
-        result = "%s %s %s" % (metaphrase_slate_to_cpp(A, temps, expr.prec),
+        result = "%s %s %s" % (metaphrase_slate_to_cpp(A, temps,
+                                                       params,
+                                                       expr.prec),
                                op,
-                               metaphrase_slate_to_cpp(B, temps, expr.prec))
+                               metaphrase_slate_to_cpp(B, temps,
+                                                       params,
+                                                       expr.prec))
 
         return parenthesize(result, expr.prec, prec)
 
     elif isinstance(expr, Action):
         tensor, = expr.operands
         c, = expr.actee
-        result = "(%s) * %s" % (metaphrase_slate_to_cpp(tensor,
-                                                        temps,
+        result = "(%s) * %s" % (metaphrase_slate_to_cpp(tensor, temps,
+                                                        params,
                                                         expr.prec), temps[c])
         return parenthesize(result, expr.prec, prec)
 
     elif isinstance(expr, Solve):
         A, b = expr.operands
-        if expr.eigen_parameters:
-            fact = expr.eigen_parameters
-        else:
-            fact = "colPivHouseholderQr"
+        factorization = params.get("local_solve", "colPivHouseholderQr")
 
-        result = "(%s).%s().solve(%s)" % (metaphrase_slate_to_cpp(A,
-                                                                  temps,
+        result = "(%s).%s().solve(%s)" % (metaphrase_slate_to_cpp(A, temps,
+                                                                  params,
                                                                   expr.prec),
-                                          fact,
-                                          metaphrase_slate_to_cpp(b,
-                                                                  temps,
+                                          factorization,
+                                          metaphrase_slate_to_cpp(b, temps,
+                                                                  params,
                                                                   expr.prec))
         return parenthesize(result, expr.prec, prec)
 
