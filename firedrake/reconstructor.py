@@ -7,7 +7,7 @@ from __future__ import absolute_import, print_function, division
 import ufl
 
 from firedrake.function import Function
-from firedrake.par_loop import par_loop, READ, INC
+from firedrake.parloops import par_loop, READ, INC
 
 
 __all__ = ["reconstruct", "Reconstructor"]
@@ -66,7 +66,6 @@ class Reconstructor(object):
 
         super(Reconstructor, self).__init__()
         self._vb = v_b
-        self._V = V
         self._weight_function = Function(V)
         self._v_rec = Function(V)
 
@@ -80,12 +79,12 @@ class Reconstructor(object):
         """
 
         weight_kernel = """
-        for (int i=0; i<weight.ndofs; ++i) {
+        for (int i=0; i<weight.dofs; ++i) {
             weight[i][0] += 1.0;
         }"""
 
         average_kernel = """
-        for (int i=0; i<vrec.ndofs; ++i) {
+        for (int i=0; i<vrec.dofs; ++i) {
             vrec[i][0] += v_b[i][0]/weight[i][0];
         }"""
 
