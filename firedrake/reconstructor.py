@@ -10,12 +10,38 @@ from firedrake.function import Function
 from firedrake.par_loop import par_loop, READ, INC
 
 
-__all__ = ["Reconstructor"]
+__all__ = ["reconstruct", "Reconstructor"]
+
+
+def reconstruct(v_b, V):
+    """Reconstruct a :class:`.Function`, defined on a broken function
+    space and transfer its data into a function defined on an unbroken
+    finite element space.
+
+    In other words: suppose we have a function v defined on a space constructed
+    from a :class:`ufl.BrokenElement`. This methods allows one to "project"
+    the data into an unbroken function space.
+
+    This method avoids assembling a mass matrix system to solve a Galerkin
+    projection problem; instead kernels are generated which computes weighted
+    averages between facet degrees of freedom.
+
+    :arg v_b: the :class:`.Function` to reconstruct.
+    :arg V: the target function space.
+    """
+
+    if not isinstance(v_b, Function):
+        raise RuntimeError(
+            "Can only reconstruct functions. Not %s" % type(v_b)
+        )
+
+    reconstructor = Reconstructor(v_b, V)
+    result = reconstructor.reconstruct()
+    return result
 
 
 class Reconstructor(object):
-    """
-    A reconstructor takes a Firedrake function, defined on a
+    """A reconstructor takes a Firedrake function, defined on a
     "broken" function space (through means of :class:`ufl.BrokenElement`),
     and returns its representation in a non-broken space. Unlike a
     projection, this operation does not require assembling and solving
@@ -45,8 +71,7 @@ class Reconstructor(object):
         self._v_rec = Function(V)
 
     def reconstruct(self):
-        """
-        Performs two loops over mesh cells. The first
+        """Performs two loops over mesh cells. The first
         will populate the weight function. The second will
         perform the averaging and assign values to the
         reconstructed function.
