@@ -28,7 +28,8 @@ from firedrake.petsc import PETSc
 
 
 __all__ = ['Mesh', 'ExtrudedMesh', 'SubDomainData', 'unmarked',
-           'DistributedMeshOverlapType']
+           'DistributedMeshOverlapType',
+           'writeGmf', 'readGmfMesh', 'readGmfSol']
 
 
 _cells = {
@@ -1482,3 +1483,26 @@ def SubDomainData(geometric_expr):
     # Create cell subset
     indices, = np.nonzero(f.dat.data_ro_with_halos > 0.5)
     return op2.Subset(m.cell_set, indices)
+
+
+def writeGmf(mesh, writeMesh, bdLabelName, meshName, sol, solType, solName, section):
+
+    if sol:
+        with sol.dat.vec_ro as vec:
+            dmplex.petscWriteGmf(mesh.topology._plex, writeMesh, bdLabelName, meshName, 1, vec, solType, solName, section)
+    else:
+        dmplex.petscWriteGmf(mesh.topology._plex, writeMesh, bdLabelName, meshName, 0, None, solType, solName, section)
+
+
+def readGmfMesh(meshName, dim, bdLabelName):
+
+    plex = dmplex.petscReadGmfMesh(meshName, dim, bdLabelName)
+    mesh = Mesh(plex)
+    return mesh
+
+
+def readGmfSol(mesh, sol, solName, solType, section):
+
+    solVec = dmplex.petscReadGmfSol(mesh._plex, solName, solType, section)
+    vStart, vEnd = mesh._plex.getDepthStratum(0)
+    sol.dat.data[...] = np.array(solVec.getArray(readonly=True)).reshape(sol.dat.data.shape)
