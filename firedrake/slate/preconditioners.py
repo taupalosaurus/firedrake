@@ -155,14 +155,14 @@ class HybridizationPC(PCBase):
 
             # separate out the top and bottom bcs
             extruded_neumann_subdomains = neumann_subdomains & {"top", "bottom"}
-            neumann_subdomains = neumann_subdomains.difference(extruded_neumann_subdomains)
+            neumann_subdomains = neumann_subdomains - extruded_neumann_subdomains
 
             integrand = gammar * ufl.dot(sigma, n)
             measures = []
             trace_subdomains = []
             if mesh.cell_set._extruded:
                 ds = ufl.ds_v
-                for subdomain in extruded_neumann_subdomains:
+                for subdomain in sorted(extruded_neumann_subdomains):
                     measures.append({"top": ufl.ds_t, "bottom": ufl.ds_b}[subdomain])
                 trace_subdomains.extend(sorted({"top", "bottom"} - extruded_neumann_subdomains))
             else:
@@ -170,8 +170,9 @@ class HybridizationPC(PCBase):
             if "on_boundary" in neumann_subdomains:
                 measures.append(ds)
             else:
-                measures.extend([ds(sd) for sd in neumann_subdomains])
-                dirichlet_subdomains = set(mesh.exterior_facets.unique_markers) - neumann_subdomains
+                measures.extend((ds(sd) for sd in sorted(neumann_subdomains)))
+                markers = [int(x) for x in mesh.exterior_facets.unique_markers]
+                dirichlet_subdomains = set(markers) - neumann_subdomains
                 trace_subdomains.extend(sorted(dirichlet_subdomains))
 
             for measure in measures:
@@ -199,13 +200,18 @@ class HybridizationPC(PCBase):
             tensor=self.schur_rhs,
             form_compiler_parameters=self.ctx.fc_params)
 
+        mat_type = PETSc.Options().getString(prefix + "mat_type", "aij")
+
         schur_comp = K * Atilde.inv * K.T
         self.S = allocate_matrix(schur_comp, bcs=trace_bcs,
-                                 form_compiler_parameters=self.ctx.fc_params)
+                                 form_compiler_parameters=self.ctx.fc_params,
+                                 mat_type=mat_type,
+                                 options_prefix=prefix)
         self._assemble_S = create_assembly_callable(schur_comp,
                                                     tensor=self.S,
                                                     bcs=trace_bcs,
-                                                    form_compiler_parameters=self.ctx.fc_params)
+                                                    form_compiler_parameters=self.ctx.fc_params,
+                                                    mat_type=mat_type)
 
         self._assemble_S()
         self.S.force_evaluation()
@@ -265,12 +271,14 @@ class HybridizationPC(PCBase):
 
         M = D - C * A.inv * B
         R = K_1.T - C * A.inv * K_0.T
-        u_rec = M.inv * (f - C * A.inv * g - R * lambdar)
+        u_rec = M.solve(f - C * A.inv * g - R * lambdar,
+                        decomposition="PartialPivLU")
         self._sub_unknown = create_assembly_callable(u_rec,
                                                      tensor=u,
                                                      form_compiler_parameters=self.ctx.fc_params)
 
-        sigma_rec = A.inv * (g - B * AssembledVector(u) - K_0.T * lambdar)
+        sigma_rec = A.solve(g - B * AssembledVector(u) - K_0.T * lambdar,
+                            decomposition="PartialPivLU")
         self._elim_unknown = create_assembly_callable(sigma_rec,
                                                       tensor=sigma,
                                                       form_compiler_parameters=self.ctx.fc_params)

@@ -1,11 +1,11 @@
-
 import ufl
 
 from firedrake import dmhooks
+from firedrake import slate
 from firedrake import solving_utils
 from firedrake import ufl_expr
 from firedrake import utils
-from firedrake.petsc import PETSc
+from firedrake.petsc import PETSc, OptionsManager
 
 __all__ = ["LinearVariationalProblem",
            "LinearVariationalSolver",
@@ -40,8 +40,8 @@ class NonlinearVariationalProblem(object):
         self.bcs = solving._extract_bcs(bcs)
 
         # Argument checking
-        if not isinstance(self.F, ufl.Form):
-            raise TypeError("Provided residual is a '%s', not a Form" % type(self.F).__name__)
+        if not isinstance(self.F, (ufl.Form, slate.slate.TensorBase)):
+            raise TypeError("Provided residual is a '%s', not a Form or Slate Tensor" % type(self.F).__name__)
         if len(self.F.arguments()) != 1:
             raise ValueError("Provided residual is not a linear form")
         if not isinstance(self.u, function.Function):
@@ -51,12 +51,12 @@ class NonlinearVariationalProblem(object):
         # the Jacobian from the residual.
         self.J = J or ufl_expr.derivative(F, u)
 
-        if not isinstance(self.J, ufl.Form):
-            raise TypeError("Provided Jacobian is a '%s', not a Form" % type(self.J).__name__)
+        if not isinstance(self.J, (ufl.Form, slate.slate.TensorBase)):
+            raise TypeError("Provided Jacobian is a '%s', not a Form or Slate Tensor" % type(self.J).__name__)
         if len(self.J.arguments()) != 2:
             raise ValueError("Provided Jacobian is not a bilinear form")
-        if self.Jp is not None and not isinstance(self.Jp, ufl.Form):
-            raise TypeError("Provided preconditioner is a '%s', not a Form" % type(self.Jp).__name__)
+        if self.Jp is not None and not isinstance(self.Jp, (ufl.Form, slate.slate.TensorBase)):
+            raise TypeError("Provided preconditioner is a '%s', not a Form or Slate Tensor" % type(self.Jp).__name__)
         if self.Jp is not None and len(self.Jp.arguments()) != 2:
             raise ValueError("Provided preconditioner is not a bilinear form")
 
@@ -69,7 +69,7 @@ class NonlinearVariationalProblem(object):
         return self.u.function_space().dm
 
 
-class NonlinearVariationalSolver(solving_utils.ParametersMixin):
+class NonlinearVariationalSolver(OptionsManager):
     """Solves a :class:`NonlinearVariationalProblem`."""
 
     def __init__(self, problem, **kwargs):
@@ -154,7 +154,8 @@ class NonlinearVariationalSolver(solving_utils.ParametersMixin):
                                          pmat_type=pmat_type,
                                          appctx=appctx,
                                          pre_jacobian_callback=pre_j_callback,
-                                         pre_function_callback=pre_f_callback)
+                                         pre_function_callback=pre_f_callback,
+                                         options_prefix=self.options_prefix)
 
         # No preconditioner by default for matrix-free
         if (problem.Jp is not None and pmatfree) or matfree:
@@ -173,7 +174,7 @@ class NonlinearVariationalSolver(solving_utils.ParametersMixin):
         self.snes.setDM(problem.dm)
 
         ctx.set_function(self.snes)
-        ctx.set_jacobian(self.snes, self.options_prefix)
+        ctx.set_jacobian(self.snes)
         ctx.set_nullspace(nullspace, problem.J.arguments()[0].function_space()._ises,
                           transpose=False, near=False)
         ctx.set_nullspace(nullspace_T, problem.J.arguments()[1].function_space()._ises,
@@ -265,12 +266,14 @@ class LinearVariationalProblem(NonlinearVariationalProblem):
         # In the linear case, the Jacobian is the equation LHS.
         J = a
         # Jacobian is checked in superclass, but let's check L here.
-        if not isinstance(L, ufl.Form):
-            raise TypeError("Provided RHS is a '%s', not a Form" % type(L).__name__)
-        if len(L.arguments()) != 1:
-            raise ValueError("Provided RHS is not a linear form")
-
-        F = ufl.action(J, u) - L
+        if L is 0:
+            F = ufl_expr.action(J, u)
+        else:
+            if not isinstance(L, (ufl.Form, slate.slate.TensorBase)):
+                raise TypeError("Provided RHS is a '%s', not a Form or Slate Tensor" % type(L).__name__)
+            if len(L.arguments()) != 1:
+                raise ValueError("Provided RHS is not a linear form")
+            F = ufl_expr.action(J, u) - L
 
         super(LinearVariationalProblem, self).__init__(F, u, bcs, J, aP,
                                                        form_compiler_parameters=form_compiler_parameters)
