@@ -78,7 +78,7 @@ class AnisotropicAdaptation(AdaptationBase):
 
         # TODO inner facets tags will be lost. Do we want a test and/or a warning ?
 
-        new_plex = plex.adaptMetric(reordered_metric, "Face Sets")
+        new_plex = plex.adaptMetric(reordered_metric, bdlabel="Face Sets", rglabel="Cell Sets")
         new_mesh = Mesh(new_plex, distribute=False)
         return new_mesh
 
