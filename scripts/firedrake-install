@@ -59,14 +59,16 @@ class FiredrakeConfiguration(dict):
 
 
 def deep_update(this, that):
-    import collections
+    from collections import abc
     for k, v in that.items():
-        if isinstance(v, collections.Mapping) and k in this.keys():
+        if isinstance(v, abc.Mapping) and k in this.keys():
             this[k] = deep_update(this.get(k, {}), v)
         else:
             this[k] = v
     return this
 
+
+invocation_directory = os.path.abspath(os.getcwd())
 
 if os.path.basename(__file__) == "firedrake-install":
     mode = "install"
@@ -79,9 +81,10 @@ else:
 
 # Set up logging
 # Log to file at DEBUG level
+logfile = os.path.join(invocation_directory, 'firedrake-%s.log' % mode)
 logging.basicConfig(level=logging.DEBUG,
                     format='%(asctime)s %(levelname)-6s %(message)s',
-                    filename='firedrake-%s.log' % mode,
+                    filename=logfile,
                     filemode='w')
 # Log to console at INFO level
 console = logging.StreamHandler()
@@ -348,7 +351,7 @@ where shortname is one of the names given below:
 
 @atexit.register
 def print_log_location():
-    log.info("\n\n%s log saved in firedrake-%s.log" % (mode.capitalize(), mode))
+    log.info("\n\n%s log saved in %s" % (mode.capitalize(), logfile))
 
 
 class directory(object):
@@ -413,9 +416,9 @@ if options["minimal_petsc"]:
         petsc_opts += """--download-chaco --download-metis --download-parmetis --download-scalapack --download-hypre --download-mumps --download-hdf5 --download-pragmatic"""
 else:
     if options["petsc_int_type"] == "int64":
-        petsc_opts += """--download-metis --download-parmetis --download-hypre --download-netcdf --download-pnetcdf --download-hdf5 --download-exodusii --download-pragmatic --with-64-bit-indices"""
+        petsc_opts += """--download-metis --download-parmetis --download-hypre --with-zlib --download-netcdf --download-pnetcdf --download-hdf5 --download-exodusii --download-pragmatic --with-64-bit-indices"""
     else:
-        petsc_opts += """--download-chaco --download-metis --download-parmetis --download-scalapack --download-hypre --download-mumps --download-netcdf --download-hdf5 --download-pnetcdf --download-exodusii --download-pragmatic"""
+        petsc_opts += """--download-chaco --download-metis --download-parmetis --download-scalapack --download-hypre --download-mumps --with-zlib --download-netcdf --download-hdf5 --download-pnetcdf --download-exodusii --download-pragmatic"""
 
 
 if "PETSC_CONFIGURE_OPTIONS" not in os.environ:
@@ -523,7 +526,7 @@ def git_clone(url):
         log.info("Successfully cloned repository %s" % name)
     except (subprocess.CalledProcessError, InstallError):
         if not options["disable_ssh"]:
-            log.warn("Failed to clone %s using ssh, falling back to https." % name)
+            log.warning("Failed to clone %s using ssh, falling back to https." % name)
         try:
             check_call(["git", "clone", "-q", git_url(plain_url, "https")])
             log.info("Successfully cloned repository %s." % name)
@@ -610,6 +613,18 @@ def pip_requirements(package):
             # FIXME: Horrible hack to work around
             # https://github.com/coin-or/pulp/issues/123
             run_pip_install(["--no-deps", "-r", "%s/requirements.txt" % package])
+        elif package == "pyadjoint":
+            with open("%s/requirements.txt" % package, "r") as f:
+                reqs = f.readlines()
+            for req in reqs:
+                req = req.strip()
+                try:
+                    run_pip_install([req])
+                except subprocess.CalledProcessError as e:
+                    if req == "tensorflow":
+                        log.debug("Skipping failing install of optional pyadjoint dependency tensorflow")
+                    else:
+                        raise e
         else:
             run_pip_install(["-r", "%s/requirements.txt" % package])
     else:
@@ -671,8 +686,8 @@ def get_petsc_dir():
         petsc_arch = os.environ.get("PETSC_ARCH", "")
     else:
         try:
-            petsc_dir = check_output(python +
-                                     ["-c", "import petsc; print(petsc.get_petsc_dir())"]).strip()
+            petsc_dir = check_output(python
+                                     + ["-c", "import petsc; print(petsc.get_petsc_dir())"]).strip()
 
             petsc_arch = ""
         except subprocess.CalledProcessError:
@@ -689,8 +704,8 @@ def get_slepc_dir():
             raise InstallError("Need to set SLEPC_DIR for --slepc with --honour-petsc-dir")
     else:
         try:
-            slepc_dir = check_output(python +
-                                     ["-c", "import slepc; print(slepc.get_slepc_dir())"]).strip()
+            slepc_dir = check_output(python
+                                     + ["-c", "import slepc; print(slepc.get_slepc_dir())"]).strip()
         except subprocess.CalledProcessError:
             raise InstallError("Unable to find installed SLEPc")
     return slepc_dir, petsc_arch
@@ -850,16 +865,16 @@ def build_and_install_slepc():
     if os.path.exists("slepc4py"):
         slepc4py_changed = False
         with directory("slepc4py"):
-                plain_url = split_requirements_url(url)[1]
-                current_remote = check_output(["git", "remote", "-v"]).split()[1]
-                proto = "https" if current_remote.startswith("https") else "ssh"
-                new_remote = git_url(plain_url, proto)
-                if new_remote != current_remote:
-                    log.info("Updating git remote for slepc4py from %s to %s", current_remote, new_remote)
-                    check_call(["git", "remote", "set-url", "origin", new_remote])
-                    check_call(["git", "fetch", "-p", "origin"])
-                    check_call(["git", "checkout", "firedrake"])
-                    slepc4py_changed = True
+            plain_url = split_requirements_url(url)[1]
+            current_remote = check_output(["git", "remote", "-v"]).split()[1]
+            proto = "https" if current_remote.startswith("https") else "ssh"
+            new_remote = git_url(plain_url, proto)
+            if new_remote != current_remote:
+                log.info("Updating git remote for slepc4py from %s to %s", current_remote, new_remote)
+                check_call(["git", "remote", "set-url", "origin", new_remote])
+                check_call(["git", "fetch", "-p", "origin"])
+                check_call(["git", "checkout", "firedrake"])
+                slepc4py_changed = True
         slepc4py_changed |= git_update("slepc4py")
     else:
         git_clone(url)
@@ -900,9 +915,9 @@ def install_documentation_dependencies():
     """Just install the required dependencies. There are no provenance
     issues here so no need to record this in the configuration dict."""
     log.info("Installing documentation dependencies")
-    run_pip_install(["--ignore-installed", "sphinx"])
-    run_pip_install(["--ignore-installed", "sphinxcontrib-bibtex"])
-    run_pip_install(["--ignore-installed", "git+https://github.com/sphinx-contrib/youtube.git"])
+    run_pip_install(["sphinx"])
+    run_pip_install(["sphinxcontrib-bibtex"])
+    run_pip_install(["git+https://github.com/sphinx-contrib/youtube.git"])
 
 
 def clean_obsolete_packages():
@@ -1021,10 +1036,10 @@ if mode == "install" or not args.update_script:
                             "git",
                             "libblas-dev",
                             "liblapack-dev",
-                            "libopenmpi-dev",
+                            "libmpich-dev",
                             "libtool",
                             "mercurial",
-                            "openmpi-bin",
+                            "mpich",
                             "python3-dev",
                             "python3-pip",
                             "python3-tk",
@@ -1051,7 +1066,7 @@ if mode == "install" or not args.update_script:
             log.info("* zlib")
 
     else:
-        log.warn("You do not appear to be running Linux or MacOS. Please do not be surprised if this install fails.")
+        log.warning("You do not appear to be running Linux or MacOS. Please do not be surprised if this install fails.")
 
 
 if mode == "install":
@@ -1183,7 +1198,7 @@ else:
             git_update(p, deps.get(p, None))
         except OSError as e:
             if e.errno == 2:
-                log.warn("%s missing, cloning anew.\n" % p)
+                log.warning("%s missing, cloning anew.\n" % p)
                 git_clone(deps[p])
             else:
                 raise
@@ -1215,6 +1230,9 @@ else:
     for p in packages:
         clean(p)
         install(p+"/")
+
+    # Ensure pytest is at the latest version
+    run_pip(["install", "-U", "pytest"])
 
 if options["slepc"]:
     build_and_install_slepc()

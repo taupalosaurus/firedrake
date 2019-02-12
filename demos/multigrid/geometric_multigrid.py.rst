@@ -137,8 +137,9 @@ with specified velocity inflow and outflow conditions. ::
 
   u, p = TrialFunctions(Z)
   v, q = TestFunctions(Z)
+  nu = Constant(1)
 
-  a = (inner(grad(u), grad(v)) - p * div(v) + div(u) * q)*dx
+  a = (nu*inner(grad(u), grad(v)) - p * div(v) + div(u) * q)*dx
 
   L = inner(Constant((0, 0)), v) * dx
 
@@ -164,37 +165,46 @@ remembering to tell PETSc to use pivoting in the factorisation. ::
   solve(a == L, u, bcs=bcs, solver_parameters={"ksp_type": "preonly",
                                                "pc_type": "lu",
                                                "pc_factor_shift_type": "inblocks",
-                                               "ksp_monitor": True,
+                                               "ksp_monitor": None,
                                                "pmat_type": "aij"})
 
-Next we'll use a schur complement solver, using geometric multigrid to
-invert the velocity block. ::
+Next we'll use a Schur complement solver, using geometric multigrid to
+invert the velocity block. The Schur complement is spectrally equivalent
+to the viscosity-weighted pressure mass matrix. Since the pressure mass
+matrix does not appear in the original form, we need to supply its
+bilinear form to the solver ourselves: ::
+
+  class Mass(AuxiliaryOperatorPC):
+
+      def form(self, pc, test, trial):
+          a = 1/nu * inner(test, trial)*dx
+          bcs = None
+          return (a, bcs)
 
   parameters = {
       "ksp_type": "gmres",
-      "ksp_monitor": True,
+      "ksp_monitor": None,
       "pc_type": "fieldsplit",
       "pc_fieldsplit_type": "schur",
       "pc_fieldsplit_schur_fact_type": "lower",
       "fieldsplit_0_ksp_type": "preonly",
       "fieldsplit_0_pc_type": "mg",
       "fieldsplit_1_ksp_type": "preonly",
-      "fieldsplit_1_pc_type": "bjacobi",
-      "fieldsplit_1_sub_pc_type": "icc",
+      "fieldsplit_1_pc_type": "python",
+      "fieldsplit_1_pc_python_type": "__main__.Mass",
+      "fieldsplit_1_aux_pc_type": "bjacobi",
+      "fieldsplit_1_aux_sub_pc_type": "icc",
   }
 
-We provide an auxiliary operator so that we can precondition the schur
-complement inverse with a pressure mass matrix. ::
-
-  Jp = a + p*q*dx
   u = Function(Z)
-  solve(a == L, u, bcs=bcs, Jp=Jp, solver_parameters=parameters)
+  solve(a == L, u, bcs=bcs, solver_parameters=parameters)
 
 Finally, we'll use coupled geometric multigrid on the full problem,
-using schur complement "smoothers" on each level.  On the coarse grid
-we use a full factorisation with LU for the velocity block, whereas on
-the finer levels we use incomplete factorisations for the velocity
-block.
+using Schur complement "smoothers" on each level. On the coarse grid
+we use a full factorisation for the velocity and Schur complement
+approximations, whereas on the finer levels we use incomplete
+factorisations for the velocity block and Schur complement
+approximations.
 
 .. note::
 
@@ -206,7 +216,7 @@ block.
 
   parameters = {
         "ksp_type": "gcr",
-        "ksp_monitor": True,
+        "ksp_monitor": None,
         "mat_type": "nest",
         "pc_type": "mg",
         "mg_coarse_ksp_type": "preonly",
@@ -215,37 +225,33 @@ block.
         "mg_coarse_pc_fieldsplit_schur_fact_type": "full",
         "mg_coarse_fieldsplit_0_ksp_type": "preonly",
         "mg_coarse_fieldsplit_0_pc_type": "lu",
-        "mg_coarse_fieldsplit_1_ksp_type": "richardson",
-        "mg_coarse_fieldsplit_1_ksp_richardson_self_scale": True,
-        "mg_coarse_fieldsplit_1_ksp_max_it": 5,
-        "mg_coarse_fieldsplit_1_pc_type": "none",
+        "mg_coarse_fieldsplit_1_ksp_type": "preonly",
+        "mg_coarse_fieldsplit_1_pc_type": "python",
+        "mg_coarse_fieldsplit_1_pc_python_type": "__main__.Mass",
+        "mg_coarse_fieldsplit_1_aux_pc_type": "cholesky",
         "mg_levels_ksp_type": "richardson",
         "mg_levels_ksp_max_it": 1,
         "mg_levels_pc_type": "fieldsplit",
         "mg_levels_pc_fieldsplit_type": "schur",
         "mg_levels_pc_fieldsplit_schur_fact_type": "upper",
         "mg_levels_fieldsplit_0_ksp_type": "richardson",
+        "mg_levels_fieldsplit_0_ksp_convergence_test": "skip",
         "mg_levels_fieldsplit_0_ksp_max_it": 2,
-        "mg_levels_fieldsplit_0_ksp_richardson_self_scale": True,
+        "mg_levels_fieldsplit_0_ksp_richardson_self_scale": None,
         "mg_levels_fieldsplit_0_pc_type": "bjacobi",
         "mg_levels_fieldsplit_0_sub_pc_type": "ilu",
         "mg_levels_fieldsplit_1_ksp_type": "richardson",
-        "mg_levels_fieldsplit_1_ksp_richardson_self_scale": True,
+        "mg_levels_fieldsplit_1_ksp_convergence_test": "skip",
+        "mg_levels_fieldsplit_1_ksp_richardson_self_scale": None,
         "mg_levels_fieldsplit_1_ksp_max_it": 3,
-        "mg_levels_fieldsplit_1_pc_type": "none",
+        "mg_levels_fieldsplit_1_pc_type": "python",
+        "mg_levels_fieldsplit_1_pc_python_type": "__main__.Mass",
+        "mg_levels_fieldsplit_1_aux_pc_type": "bjacobi",
+        "mg_levels_fieldsplit_1_aux_sub_pc_type": "icc",
   }
 
   u = Function(Z)
   solve(a == L, u, bcs=bcs, solver_parameters=parameters)
-
-.. note::
-
-   We would really like to be able to provide an operator on the
-   coarse grids to precondition the inverse of the schur complement,
-   for example a viscosity-weighted mass matrix.  Unfortunately, PETSc
-   does not currently allow us to provide separate Jacobian and
-   preconditioning matrices for nonlinear solves on coarse levels.
-   This preconditioner is therefore not parameter-independent.
 
 Finally, we'll write the solution for visualisation with Paraview. ::
 
