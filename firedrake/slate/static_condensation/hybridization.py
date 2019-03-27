@@ -14,6 +14,9 @@ __all__ = ['HybridizationPC']
 
 
 class HybridizationPC(SCBase):
+
+    needs_python_pmat = True
+
     """A Slate-based python preconditioner that solves a
     mixed H(div)-conforming problem using hybridization.
     Currently, this preconditioner supports the hybridization
@@ -290,7 +293,12 @@ class HybridizationPC(SCBase):
         self.S.force_evaluation()
 
     def forward_elimination(self, pc, x):
-        """
+        """Perform the forward elimination of fields and
+        provide the reduced right-hand side for the condensed
+        system.
+
+        :arg pc: a Preconditioner instance.
+        :arg x: a PETSc vector containing the incoming right-hand side.
         """
 
         with timed_region("HybridBreak"):
@@ -323,7 +331,10 @@ class HybridizationPC(SCBase):
             self._assemble_Srhs()
 
     def sc_solve(self, pc):
-        """
+        """Solve the condensed linear system for the
+        condensed field.
+
+        :arg pc: a Preconditioner instance.
         """
 
         # Solve the system for the Lagrange multipliers
@@ -336,7 +347,10 @@ class HybridizationPC(SCBase):
                 self.trace_ksp.solve(b, x_trace)
 
     def backward_substitution(self, pc, y):
-        """
+        """Perform the backwards recovery of eliminated fields.
+
+        :arg pc: a Preconditioner instance.
+        :arg y: a PETSc vector for placing the resulting fields.
         """
 
         # We assemble the unknown which is an expression
