@@ -3,7 +3,7 @@ import ufl
 from ufl.corealg.map_dag import map_expr_dag
 from ufl.algorithms.multifunction import MultiFunction
 
-from functools import singledispatch
+from functools import singledispatch, partial
 import firedrake
 from firedrake.petsc import PETSc
 
@@ -124,6 +124,7 @@ def coarsen_bc(bc, self, coefficient_mapping=None):
 def coarsen_function_space(V, self, coefficient_mapping=None):
     if hasattr(V, "_coarse"):
         return V._coarse
+    from firedrake.dmhooks import get_parent, push_parent, pop_parent, add_hook
     fine = V
     indices = []
     while True:
@@ -138,21 +139,29 @@ def coarsen_function_space(V, self, coefficient_mapping=None):
 
     mesh = self(V.mesh(), self)
 
-    Vf = V
     V = firedrake.FunctionSpace(mesh, V.ufl_element())
-
-    from firedrake.dmhooks import get_transfer_operators, push_transfer_operators
-    transfer = get_transfer_operators(Vf.dm)
-    push_transfer_operators(V.dm, *transfer)
-    if len(V) > 1:
-        for V_, Vc_ in zip(Vf, V):
-            transfer = get_transfer_operators(V_.dm)
-            push_transfer_operators(Vc_.dm, *transfer)
 
     for i in reversed(indices):
         V = V.sub(i)
     V._fine = fine
     fine._coarse = V
+
+    # FIXME: This replicates some code from dmhooks.coarsen, but we
+    # can't do things there because that code calls this code.
+
+    # We need to move these operators over here because if we have
+    # fieldsplits + MG with auxiliary coefficients on spaces other
+    # than which we do the MG, dm.coarsen is never called, so the
+    # hooks are not attached. Instead we just call (say) inject which
+    # coarsens the functionspace.
+    cdm = V.dm
+    parent = get_parent(fine.dm)
+    try:
+        add_hook(parent, setup=partial(push_parent, cdm, parent), teardown=partial(pop_parent, cdm, parent),
+                 call_setup=True)
+    except ValueError:
+        # Not in an add_hooks context
+        pass
 
     return V
 
@@ -163,7 +172,15 @@ def coarsen_function(expr, self, coefficient_mapping=None):
         coefficient_mapping = {}
     new = coefficient_mapping.get(expr)
     if new is None:
-        _, _, inject = firedrake.dmhooks.get_transfer_operators(expr.function_space().dm)
+        from firedrake.dmhooks import get_parent
+        # Find potential parental mixed space (which will have an
+        # appctx attached and hence a transfer manager if we're in a
+        # solve)
+        V = expr.function_space()
+        while V.parent is not None:
+            V = V.parent
+        dm = get_parent(V.dm)
+        _, _, inject = firedrake.dmhooks.get_transfer_operators(dm)
         V = self(expr.function_space(), self)
         new = firedrake.Function(V, name="coarse_%s" % expr.name())
         inject(expr, new)
@@ -262,7 +279,8 @@ def coarsen_snescontext(context, self, coefficient_mapping=None):
     coarse = type(context)(problem,
                            mat_type=context.mat_type,
                            pmat_type=context.pmat_type,
-                           appctx=new_appctx)
+                           appctx=new_appctx,
+                           transfer_manager=context.transfer_manager)
     coarse._fine = context
     context._coarse = coarse
 
