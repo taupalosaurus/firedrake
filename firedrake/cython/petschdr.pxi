@@ -36,6 +36,18 @@ cdef extern from "petscdmplex.h" nogil:
     int DMPlexSetAdjacencyUser(PETSc.PetscDM,int(*)(PETSc.PetscDM,PetscInt,PetscInt*,PetscInt[],void*),void*)
     int DMPlexCreatePointNumbering(PETSc.PetscDM,PETSc.PetscIS*)
 
+    int DMPlexWrite_gmfMesh2d(PETSc.PetscDM, PetscBool, const char[], const char[], PetscInt, PETSc.PetscVec *,  PetscInt *, const char * [], PETSc.PetscSection, PetscBool);
+    int DMPlexWrite_gmfMesh2d_1sol(PETSc.PetscDM, PetscBool, const char [], const char [], PETSc.PetscVec, PetscInt, const char [], PETSc.PetscSection, PetscBool);
+    int DMPlexWrite_gmfMesh2d_noSol(PETSc.PetscDM, const char [], const char [], PETSc.PetscSection, PetscBool);
+    int DMPlexCreateGmfFromFile_2d(const char [], const char [], PETSc.PetscDM *);
+    int DMPlexReadGmfSolFromFile_2d(PETSc.PetscDM, PETSc.PetscSection, const char [], PetscInt, PETSc.PetscVec *);    
+
+    int DMPlexWrite_gmfMesh3d(PETSc.PetscDM, PetscBool, const char[], const char[], PetscInt, PETSc.PetscVec *,  PetscInt *, const char * [], PETSc.PetscSection, PetscBool);
+    int DMPlexWrite_gmfMesh3d_1sol(PETSc.PetscDM, PetscBool, const char [], const char [], PETSc.PetscVec, PetscInt, const char [], PETSc.PetscSection, PetscBool);
+    int DMPlexWrite_gmfMesh3d_noSol(PETSc.PetscDM, const char [], const char [], PETSc.PetscSection, PetscBool);
+    int DMPlexCreateGmfFromFile_3d(const char [], const char [], PETSc.PetscDM *);
+    int DMPlexReadGmfSolFromFile_3d(PETSc.PetscDM, PETSc.PetscSection, const char [], PetscInt, PETSc.PetscVec *);
+
 cdef extern from "petscdmlabel.h" nogil:
     struct _n_DMLabel
     ctypedef _n_DMLabel* DMLabel "DMLabel"
